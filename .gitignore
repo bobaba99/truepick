@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Important docs
+doc/marketing_story.md
+
 # Virtual environments
 venv/
 env/
