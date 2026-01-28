@@ -103,10 +103,11 @@ This makes the system feel intelligent without adding complexity.
      * Or manual entry
    * App shows exactly what data is read
    * Value setup
-        * “Spending on convenience is worth it.”
-        * “I prefer durable goods over trendy ones.”
-        * “I value experiences over objects.”
-        * “I regret impulse buys more than planned purchases.”
+        * “I value things that last several years.”
+        * “I value tools that saves time for me.”
+        * “I value items that fit my existing environment's visual language.”
+        * “I value purchases that facilitate shared experiences.”
+        * “I value purchases that provide meaningful emotional benefits.”
 
 2. **Deck Creation**
 
@@ -157,6 +158,20 @@ This makes the system feel intelligent without adding complexity.
 3. Email API connection
   - Gmail
   - Outlook
+4. Service logic
+
+### Todo
+
+- [x] User auth
+- [x] Swiping
+- [ ] Email API
+- [ ] Service logic
+- [ ] UI polish
+  - [ ] Layout
+  - [ ] Animation
+  - [ ] UX flow
+  - [ ] Premium feeling
+
 
 ## What This MVP Is (and Is Not)
 
