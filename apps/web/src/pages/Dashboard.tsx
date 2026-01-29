@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import type { Stats, VerdictRow } from '../api/types'
+import type { Stats, VerdictAlgorithm, VerdictRow } from '../api/types'
 import { PURCHASE_CATEGORIES } from '../api/types'
 import { getSwipeStats } from '../api/statsService'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
@@ -34,6 +34,8 @@ export default function Dashboard({ session }: DashboardProps) {
   const [vendor, setVendor] = useState('')
   const [justification, setJustification] = useState('')
   const [importantPurchase, setImportantPurchase] = useState(false)
+  const [verdictAlgorithm, setVerdictAlgorithm] =
+    useState<VerdictAlgorithm>('standard')
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
 
@@ -88,7 +90,12 @@ export default function Dashboard({ session }: DashboardProps) {
     // Get API key from environment (in production, this should be handled server-side)
     const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
 
-    const evaluation = await evaluatePurchase(session.user.id, input, openaiApiKey)
+    const evaluation = await evaluatePurchase(
+      session.user.id,
+      input,
+      openaiApiKey,
+      verdictAlgorithm
+    )
     const { error } = await createVerdict(session.user.id, input, evaluation)
 
     if (error) {
@@ -204,14 +211,43 @@ export default function Dashboard({ session }: DashboardProps) {
                 rows={8}
               />
             </label>
-            <label className="checkbox-row">
+            <div className="toggle-row">
               <input
+                id="important-purchase-toggle"
                 type="checkbox"
                 checked={importantPurchase}
                 onChange={(e) => setImportantPurchase(e.target.checked)}
+                aria-labelledby="important-purchase-label"
               />
-              <span>Important purchase</span>
-            </label>
+              <span id="important-purchase-label" className="toggle-label">
+                Important purchase
+              </span>
+            </div>
+            <div className="algorithm-toggle">
+              <span className="toggle-label">Scoring model</span>
+              <div className="segmented-toggle" role="radiogroup" aria-label="Scoring model">
+                <label>
+                  <input
+                    type="radio"
+                    name="verdict-algorithm"
+                    value="standard"
+                    checked={verdictAlgorithm === 'standard'}
+                    onChange={() => setVerdictAlgorithm('standard')}
+                  />
+                  <span>Standard logistic</span>
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="verdict-algorithm"
+                    value="cost_sensitive_iso"
+                    checked={verdictAlgorithm === 'cost_sensitive_iso'}
+                    onChange={() => setVerdictAlgorithm('cost_sensitive_iso')}
+                  />
+                  <span>Cost-sensitive isotonic</span>
+                </label>
+              </div>
+            </div>
             <button className="primary" type="submit" disabled={submitting}>
               {submitting ? 'Evaluating...' : 'Evaluate'}
             </button>

@@ -107,6 +107,7 @@ create table verdicts (
   candidate_category purchaseCategory,
   candidate_vendor text,
   candidate_vendor_id int, -- optional FK to vendors when matched
+  scoring_model text check (scoring_model in ('standard', 'cost_sensitive_iso')) default 'standard',
   justification text, -- user's stated reason for considering purchase
   predicted_outcome text check (predicted_outcome in ('buy', 'hold', 'skip')),
   confidence_score decimal(5,4), -- 0.0 to 1.0

@@ -4,6 +4,7 @@ import type {
   LLMEvaluationResponse,
   PurchaseInput,
   UserDecision,
+  VerdictAlgorithm,
   VerdictOutcome,
   VerdictRow,
 } from './types'
@@ -17,10 +18,8 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './verdictPrompts'
 import {
   buildScore,
-  computeDecisionScore,
   computeFinancialStrain,
-  confidenceFromScore,
-  decisionFromScore,
+  computeDecisionByAlgorithm,
   evaluatePurchaseFallback,
 } from './verdictScoring'
 
@@ -28,7 +27,7 @@ export async function getRecentVerdict(userId: string): Promise<VerdictRow | nul
   const { data, error } = await supabase
     .from('verdicts')
     .select(
-      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, justification, predicted_outcome, confidence_score, reasoning, hold_release_at, created_at'
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, hold_release_at, created_at'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -49,7 +48,7 @@ export async function getVerdictHistory(
   const { data, error } = await supabase
     .from('verdicts')
     .select(
-      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -151,6 +150,7 @@ export async function createVerdict(
   evaluation: EvaluationResult
 ): Promise<{ error: string | null }> {
   const vendorMatch = await retrieveVendorMatch(input)
+  const scoringModel = evaluation.reasoning?.algorithm ?? 'standard'
   const holdReleaseAt =
     evaluation.outcome === 'hold'
       ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
@@ -163,6 +163,7 @@ export async function createVerdict(
     candidate_category: input.category,
     candidate_vendor: input.vendor,
     candidate_vendor_id: vendorMatch?.vendor_id ?? null,
+    scoring_model: scoringModel,
     justification: input.justification,
     predicted_outcome: evaluation.outcome,
     confidence_score: evaluation.confidence,
@@ -176,7 +177,8 @@ export async function createVerdict(
 export async function evaluatePurchase(
   userId: string,
   input: PurchaseInput,
-  openaiApiKey?: string
+  openaiApiKey?: string,
+  algorithm: VerdictAlgorithm = 'standard'
 ): Promise<EvaluationResult> {
   const vendorMatch = await retrieveVendorMatch(input)
   const { data: profile } = await supabase
@@ -213,6 +215,7 @@ export async function evaluatePurchase(
       profileContextSummary: profileContext,
       similarPurchasesSummary: similarPurchases,
       recentPurchasesSummary: recentPurchases,
+      algorithm,
     })
   }
 
@@ -273,7 +276,7 @@ export async function evaluatePurchase(
       llmResponse.emotional_support.explanation
     )
 
-    const decisionScore = computeDecisionScore({
+    const decisionResult = computeDecisionByAlgorithm(algorithm, {
       valueConflict: valueConflict.score,
       patternRepetition: patternRepetition.score,
       emotionalImpulse: emotionalImpulse.score,
@@ -283,8 +286,8 @@ export async function evaluatePurchase(
     })
 
     return {
-      outcome: decisionFromScore(decisionScore),
-      confidence: confidenceFromScore(decisionScore),
+      outcome: decisionResult.outcome,
+      confidence: decisionResult.confidence,
       reasoning: {
         valueConflict,
         patternRepetition,
@@ -292,9 +295,10 @@ export async function evaluatePurchase(
         financialStrain,
         longTermUtility,
         emotionalSupport,
-        decisionScore,
+        decisionScore: decisionResult.decisionScore,
         rationale: llmResponse.rationale,
         importantPurchase: input.isImportant,
+        algorithm,
       },
     }
   } catch (error) {
@@ -306,6 +310,7 @@ export async function evaluatePurchase(
       profileContextSummary: profileContext,
       similarPurchasesSummary: similarPurchases,
       recentPurchasesSummary: recentPurchases,
+      algorithm,
     })
   }
 }

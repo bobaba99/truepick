@@ -2,20 +2,53 @@ import type {
   EvaluationResult,
   PurchaseInput,
   ScoreExplanation,
+  VerdictAlgorithm,
   VerdictOutcome,
   VendorMatch,
 } from './types'
 import { clamp01 } from './utils'
 
 export const WEIGHTS = {
-  intercept: 0.18,
-  value_conflict: 0.34,
-  pattern_repetition: 0.41,
-  emotional_impulse: 0.27,
-  financial_strain: 0.12,
-  long_term_utility: 0.29,
-  emotional_support: 0.29,
-}
+  intercept: -1.208324,
+  value_conflict: 2.618259,
+  pattern_repetition: -2.507522,
+  emotional_impulse: 2.38308,
+  financial_strain: 0.933266,
+  long_term_utility: -2.730036,
+  emotional_support: -0.835071,
+} as const
+
+const COST_SENSITIVE_WEIGHTS = {
+  intercept: -0.147321,
+  value_conflict: 2.667996,
+  pattern_repetition: -2.568795,
+  emotional_impulse: 2.353324,
+  financial_strain: 0.897642,
+  long_term_utility: -2.82861,
+  emotional_support: -0.938034,
+} as const
+
+const COST_SENSITIVE_THRESHOLDS = {
+  buy: 0.35,
+  skip: 0.65,
+} as const
+
+const COST_SENSITIVE_CALIBRATION: Array<[number, number]> = [
+  [0.0, 0.0],
+  [0.1, 0.0],
+  [0.2, 0.0],
+  [0.3, 0.0],
+  [0.4, 0.18],
+  [0.45, 0.2],
+  [0.5, 0.22],
+  [0.55, 0.3],
+  [0.6, 0.42],
+  [0.7, 0.53],
+  [0.75, 0.6],
+  [0.8, 0.72],
+  [0.9, 0.9],
+  [1.0, 1.0],
+]
 
 export const VENDOR_RUBRIC = {
   quality: {
@@ -265,6 +298,110 @@ export const computeDecisionScore = (params: {
   )
 }
 
+const sigmoid = (logit: number) => 1 / (1 + Math.exp(-logit))
+
+const calibrateProbability = (rawProb: number) => {
+  if (rawProb <= 0) return 0
+  if (rawProb >= 1) return 1
+
+  let lower = COST_SENSITIVE_CALIBRATION[0]
+  let upper = COST_SENSITIVE_CALIBRATION[COST_SENSITIVE_CALIBRATION.length - 1]
+
+  for (let i = 0; i < COST_SENSITIVE_CALIBRATION.length - 1; i += 1) {
+    const [rawLower] = COST_SENSITIVE_CALIBRATION[i]
+    const [rawUpper] = COST_SENSITIVE_CALIBRATION[i + 1]
+    if (rawProb >= rawLower && rawProb <= rawUpper) {
+      lower = COST_SENSITIVE_CALIBRATION[i]
+      upper = COST_SENSITIVE_CALIBRATION[i + 1]
+      break
+    }
+  }
+
+  const [rawLow, calLow] = lower
+  const [rawHigh, calHigh] = upper
+  if (rawHigh === rawLow) return calLow
+
+  const t = (rawProb - rawLow) / (rawHigh - rawLow)
+  return calLow + t * (calHigh - calLow)
+}
+
+const costSensitiveDecisionFromScore = (calProb: number): VerdictOutcome => {
+  if (calProb >= COST_SENSITIVE_THRESHOLDS.skip) return 'skip'
+  if (calProb >= COST_SENSITIVE_THRESHOLDS.buy) return 'hold'
+  return 'buy'
+}
+
+const costSensitiveConfidenceFromScore = (calProb: number, decision: VerdictOutcome) => {
+  const { buy, skip } = COST_SENSITIVE_THRESHOLDS
+  const holdMid = (buy + skip) / 2
+
+  if (decision === 'buy') {
+    const normalized = (buy - calProb) / buy
+    return Math.min(0.95, 0.5 + 0.45 * normalized)
+  }
+  if (decision === 'skip') {
+    const normalized = (calProb - skip) / (1 - skip)
+    return Math.min(0.95, 0.5 + 0.45 * normalized)
+  }
+
+  const maxDist = (skip - buy) / 2
+  const distFromMid = Math.abs(calProb - holdMid)
+  return Math.max(0.5, 0.9 - 0.4 * (distFromMid / maxDist))
+}
+
+const computeCostSensitiveScore = (params: {
+  valueConflict: number
+  patternRepetition: number
+  emotionalImpulse: number
+  financialStrain: number
+  longTermUtility: number
+  emotionalSupport: number
+}) => {
+  const logit =
+    COST_SENSITIVE_WEIGHTS.intercept +
+    COST_SENSITIVE_WEIGHTS.value_conflict * params.valueConflict +
+    COST_SENSITIVE_WEIGHTS.pattern_repetition * params.patternRepetition +
+    COST_SENSITIVE_WEIGHTS.emotional_impulse * params.emotionalImpulse +
+    COST_SENSITIVE_WEIGHTS.financial_strain * params.financialStrain +
+    COST_SENSITIVE_WEIGHTS.long_term_utility * params.longTermUtility +
+    COST_SENSITIVE_WEIGHTS.emotional_support * params.emotionalSupport
+
+  const rawProb = sigmoid(logit)
+  const calProb = calibrateProbability(rawProb)
+  return { rawProb, calProb }
+}
+
+export const computeDecisionByAlgorithm = (
+  algorithm: VerdictAlgorithm,
+  params: {
+    valueConflict: number
+    patternRepetition: number
+    emotionalImpulse: number
+    financialStrain: number
+    longTermUtility: number
+    emotionalSupport: number
+  }
+) => {
+  if (algorithm === 'cost_sensitive_iso') {
+    const { rawProb, calProb } = computeCostSensitiveScore(params)
+    const outcome = costSensitiveDecisionFromScore(calProb)
+    return {
+      outcome,
+      confidence: costSensitiveConfidenceFromScore(calProb, outcome),
+      decisionScore: calProb,
+      rawScore: rawProb,
+    }
+  }
+
+  const decisionScore = computeDecisionScore(params)
+  const outcome = decisionFromScore(decisionScore)
+  return {
+    outcome,
+    confidence: confidenceFromScore(decisionScore),
+    decisionScore,
+  }
+}
+
 export const decisionFromScore = (score: number): VerdictOutcome => {
   if (score >= 0.7) return 'skip'
   if (score >= 0.4) return 'hold'
@@ -295,6 +432,7 @@ export const evaluatePurchaseFallback = (
     profileContextSummary?: string
     similarPurchasesSummary?: string
     recentPurchasesSummary?: string
+    algorithm?: VerdictAlgorithm
   }
 ): EvaluationResult => {
   const reasons: string[] = []
@@ -356,14 +494,17 @@ export const evaluatePurchaseFallback = (
     overrides?.financialStrain ??
     buildScore(0, 'No budget context in fallback.')
 
-  const decisionScore = computeDecisionScore({
-    valueConflict: valueConflict.score,
-    patternRepetition: patternRepetition.score,
-    emotionalImpulse: emotionalImpulse.score,
-    financialStrain: financialStrain.score,
-    longTermUtility: longTermUtility.score,
-    emotionalSupport: emotionalSupport.score,
-  })
+  const decisionResult = computeDecisionByAlgorithm(
+    overrides?.algorithm ?? 'standard',
+    {
+      valueConflict: valueConflict.score,
+      patternRepetition: patternRepetition.score,
+      emotionalImpulse: emotionalImpulse.score,
+      financialStrain: financialStrain.score,
+      longTermUtility: longTermUtility.score,
+      emotionalSupport: emotionalSupport.score,
+    }
+  )
 
   const rationaleParts = [
     summarizeProfileContext(overrides?.profileContextSummary),
@@ -381,8 +522,8 @@ export const evaluatePurchaseFallback = (
       : 'This recommendation leans on the purchase details because profile context is limited.'
 
   return {
-    outcome: decisionFromScore(decisionScore),
-    confidence: confidenceFromScore(decisionScore),
+    outcome: decisionResult.outcome,
+    confidence: decisionResult.confidence,
     reasoning: {
       valueConflict,
       patternRepetition,
@@ -390,9 +531,10 @@ export const evaluatePurchaseFallback = (
       financialStrain,
       longTermUtility,
       emotionalSupport,
-      decisionScore,
+      decisionScore: decisionResult.decisionScore,
       rationale,
       importantPurchase: input.isImportant,
+      algorithm: overrides?.algorithm ?? 'standard',
     },
   }
 }

@@ -223,7 +223,7 @@ Rated by LLM with a set of rubrics: `0` = fully aligned with pre-committed value
 mean(reflection x similarity_score)
 ```
 
-reflection: `regret`=1, `not_sure`=.5, `satisfied`=1
+reflection: `regret`=0, `not_sure`=.5, `satisfied`=1
 
 #### `emotional_impulse`
 

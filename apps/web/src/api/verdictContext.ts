@@ -323,7 +323,7 @@ export async function computePatternRepetition(
   const scores = data.map((row) => {
     switch (row.outcome) {
       case 'regret':
-        return 1
+        return 0
       case 'not_sure':
         return 0.5
       case 'satisfied':

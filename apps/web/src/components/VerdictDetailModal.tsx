@@ -125,6 +125,17 @@ export default function VerdictDetailModal({
               </div>
             )}
 
+            {verdict.scoring_model && (
+              <div className="detail-item">
+                <span className="detail-label">Scoring model</span>
+                <span className="detail-value">
+                  {verdict.scoring_model === 'cost_sensitive_iso'
+                    ? 'Cost-sensitive isotonic'
+                    : 'Standard logistic'}
+                </span>
+              </div>
+            )}
+
             {verdict.created_at && (
               <div className="detail-item">
                 <span className="detail-label">Created</span>
@@ -153,84 +164,94 @@ export default function VerdictDetailModal({
             <div className="detail-section">
               <h3>AI Analysis</h3>
 
-              {(reasoning.valueConflict ?? reasoning.valueConflictScore) && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Value Conflict Score</span>
+              <div className="analysis-grid">
+                {(reasoning.valueConflict ?? reasoning.valueConflictScore) && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Value Conflict Score</span>
+                    </div>
                     <span className="analysis-score">
-                      {(reasoning.valueConflict ?? reasoning.valueConflictScore)?.score}
+                      {(reasoning.valueConflict ?? reasoning.valueConflictScore)?.score.toFixed(2)}
                     </span>
+                    <p className="analysis-explanation">
+                      {(reasoning.valueConflict ?? reasoning.valueConflictScore)?.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {(reasoning.valueConflict ?? reasoning.valueConflictScore)?.explanation}
-                  </p>
-                </div>
-              )}
+                )}
 
-              {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk) && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Pattern Repetition Risk</span>
+                {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk) && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Pattern Repetition Risk</span>
+                    </div>
                     <span className="analysis-score">
-                      {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk)?.score}
+                      {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk)?.score.toFixed(2)}
                     </span>
+                    <p className="analysis-explanation">
+                      {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk)?.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {(reasoning.patternRepetition ?? reasoning.patternRepetitionRisk)?.explanation}
-                  </p>
-                </div>
-              )}
+                )}
 
-              {reasoning.emotionalImpulse && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Emotional Impulse</span>
-                    <span className="analysis-score">{reasoning.emotionalImpulse.score}</span>
+                {reasoning.emotionalImpulse && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Emotional Impulse</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.emotionalImpulse.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.emotionalImpulse.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {reasoning.emotionalImpulse.explanation}
-                  </p>
-                </div>
-              )}
+                )}
 
-              {reasoning.financialStrain && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Financial Strain</span>
-                    <span className="analysis-score">{reasoning.financialStrain.score}</span>
+                {reasoning.financialStrain && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Financial Strain</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.financialStrain.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.financialStrain.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {reasoning.financialStrain.explanation}
-                  </p>
-                </div>
-              )}
+                )}
 
-              {reasoning.longTermUtility && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Long-Term Utility</span>
-                    <span className="analysis-score">{reasoning.longTermUtility.score}</span>
+                {reasoning.longTermUtility && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Long-Term Utility</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.longTermUtility.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.longTermUtility.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {reasoning.longTermUtility.explanation}
-                  </p>
-                </div>
-              )}
+                )}
 
-              {reasoning.emotionalSupport && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Emotional Support</span>
-                    <span className="analysis-score">{reasoning.emotionalSupport.score}</span>
+                {reasoning.emotionalSupport && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Emotional Support</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.emotionalSupport.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.emotionalSupport.explanation}
+                    </p>
                   </div>
-                  <p className="analysis-explanation">
-                    {reasoning.emotionalSupport.explanation}
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
 
               {typeof reasoning.decisionScore === 'number' && (
-                <div className="analysis-item">
+                <div className="analysis-item analysis-item--decision">
                   <div className="analysis-header">
                     <span className="analysis-label">Decision Score</span>
                     <span className="analysis-score">{reasoning.decisionScore.toFixed(2)}</span>

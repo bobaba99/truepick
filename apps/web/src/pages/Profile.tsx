@@ -970,6 +970,7 @@ export default function Profile({ session }: ProfileProps) {
                 <label>
                   Category
                   <select
+                    className="purchase-select"
                     value={purchaseCategory || 'other'}
                     onChange={(event) => setPurchaseCategory(event.target.value)}
                   >

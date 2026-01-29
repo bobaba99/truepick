@@ -6,6 +6,8 @@ export type SwipeTiming = 'immediate' | 'day3' | 'week3' | 'month3'
 
 export type VerdictOutcome = 'buy' | 'hold' | 'skip'
 
+export type VerdictAlgorithm = 'standard' | 'cost_sensitive_iso'
+
 export type UserDecision = 'bought' | 'hold' | 'skip'
 
 export type PurchaseRow = {
@@ -53,6 +55,7 @@ export type VerdictRow = {
   candidate_price: number | null
   candidate_category?: string | null
   candidate_vendor?: string | null
+  scoring_model?: VerdictAlgorithm | null
   justification?: string | null
   predicted_outcome: VerdictOutcome | null
   reasoning?: Record<string, unknown> | null
@@ -150,6 +153,7 @@ export type LLMEvaluationReasoning = {
   decisionScore?: number
   rationale?: string
   importantPurchase?: boolean
+  algorithm?: VerdictAlgorithm
   // Legacy fields for backward compatibility
   valueConflictScore?: ValueConflictScore
   patternRepetitionRisk?: PatternRepetitionRisk
