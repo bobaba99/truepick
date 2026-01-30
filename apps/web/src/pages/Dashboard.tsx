@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ChangeEvent, KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Stats, VerdictAlgorithm, VerdictRow } from '../api/types'
@@ -166,7 +167,7 @@ export default function Dashboard({ session }: DashboardProps) {
               <VolumetricInput
                 as="input"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                 placeholder="Noise cancelling headphones"
                 required
               />
@@ -176,7 +177,7 @@ export default function Dashboard({ session }: DashboardProps) {
               <VolumetricInput
                 as="input"
                 value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setVendor(e.target.value)}
                 placeholder="Amazon"
               />
             </label>
@@ -189,13 +190,17 @@ export default function Dashboard({ session }: DashboardProps) {
                   min={0}
                   step="0.01"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
                   placeholder="299.00"
                 />
               </label>
               <label>
                 Category
-                <VolumetricInput as="select" value={category} onChange={(e: any) => setCategory(e.target.value)}>
+                <VolumetricInput
+                  as="select"
+                  value={category}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setCategory(e.target.value)}
+                >
                   {PURCHASE_CATEGORIES.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -209,7 +214,7 @@ export default function Dashboard({ session }: DashboardProps) {
               <GlassCard className="textarea-wrapper">
                 <textarea
                   value={justification}
-                  onChange={(e) => setJustification(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setJustification(e.target.value)}
                   placeholder="I need it for work calls..."
                   rows={8}
                 />
@@ -220,7 +225,7 @@ export default function Dashboard({ session }: DashboardProps) {
                 id="important-purchase-toggle"
                 type="checkbox"
                 checked={importantPurchase}
-                onChange={(e) => setImportantPurchase(e.target.checked)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setImportantPurchase(e.target.checked)}
                 aria-labelledby="important-purchase-label"
               />
               <span id="important-purchase-label" className="toggle-label">
@@ -273,13 +278,15 @@ export default function Dashboard({ session }: DashboardProps) {
                   key={verdict.id}
                   className={`verdict-card outcome-${verdict.predicted_outcome}`}
                 >
-                  <div
-                    className="verdict-card-clickable"
-                    onClick={() => setSelectedVerdict(verdict)}
-                    onKeyDown={(e) => e.key === 'Enter' && setSelectedVerdict(verdict)}
-                    role="button"
-                    tabIndex={0}
-                  >
+                    <div
+                      className="verdict-card-clickable"
+                      onClick={() => setSelectedVerdict(verdict)}
+                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) =>
+                        e.key === 'Enter' && setSelectedVerdict(verdict)
+                      }
+                      role="button"
+                      tabIndex={0}
+                    >
                     <div className="verdict-header">
                       <span className="verdict-title">{verdict.candidate_title}</span>
                       <span className="verdict-outcome">

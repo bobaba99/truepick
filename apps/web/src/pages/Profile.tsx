@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Session } from '@supabase/supabase-js'
 import type {
@@ -101,12 +102,31 @@ const decisionStyleOptions = [
   'It depends heavily on mood',
 ]
 
-const financialSensitivityOptions = [
-  'Very cautious',
-  'Balanced',
-  'Flexible',
-  'Indifferent',
-]
+const materialismItems = [
+  {
+    key: 'centrality',
+    prompt: 'Do you think it’s important to own expensive things?',
+  },
+  {
+    key: 'happiness',
+    prompt: 'Does buying expensive things make you happy?',
+  },
+  {
+    key: 'success',
+    prompt: 'Do you like people who have expensive things more than you like other people?',
+  },
+] as const
+
+const locusOfControlItems = [
+  {
+    key: 'workHard',
+    prompt: 'If I work hard, I will succeed.',
+  },
+  {
+    key: 'destiny',
+    prompt: 'Destiny often gets in the way of my plans.',
+  },
+] as const
 
 const identityStabilityOptions = [
   'Not important',
@@ -119,13 +139,15 @@ const DEFAULT_ONBOARDING: OnboardingAnswers = {
   regretPatterns: [],
   satisfactionPatterns: [],
   decisionStyle: '',
-  financialSensitivity: '',
-  spendingStressScore: 3,
-  emotionalRelationship: {
-    stability: 3,
-    excitement: 3,
-    control: 3,
-    reward: 3,
+  neuroticismScore: 3,
+  materialism: {
+    centrality: 2,
+    happiness: 2,
+    success: 2,
+  },
+  locusOfControl: {
+    workHard: 3,
+    destiny: 3,
   },
   identityStability: '',
 }
@@ -140,9 +162,13 @@ const normalizeOnboardingAnswers = (
     coreValues: answers.coreValues ?? [],
     regretPatterns: answers.regretPatterns ?? [],
     satisfactionPatterns: answers.satisfactionPatterns ?? [],
-    emotionalRelationship: {
-      ...DEFAULT_ONBOARDING.emotionalRelationship,
-      ...answers.emotionalRelationship,
+    materialism: {
+      ...DEFAULT_ONBOARDING.materialism,
+      ...answers.materialism,
+    },
+    locusOfControl: {
+      ...DEFAULT_ONBOARDING.locusOfControl,
+      ...answers.locusOfControl,
     },
   }
 }
@@ -174,6 +200,13 @@ export default function Profile({ session }: ProfileProps) {
     useState<OnboardingAnswers>(DEFAULT_ONBOARDING)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+
+  const materialismAverage =
+    (onboardingAnswers.materialism.centrality +
+      onboardingAnswers.materialism.happiness +
+      onboardingAnswers.materialism.success) /
+    3
+  const locusSummary = `Work hard ${onboardingAnswers.locusOfControl.workHard}/5, destiny ${onboardingAnswers.locusOfControl.destiny}/5`
   const [verdictSearch, setVerdictSearch] = useState('')
   const [verdictFilters, setVerdictFilters] = useState<FilterState>(INITIAL_FILTERS)
   const [purchaseSearch, setPurchaseSearch] = useState('')
@@ -626,9 +659,27 @@ export default function Profile({ session }: ProfileProps) {
             </span>
           </GlassCard>
           <GlassCard className="profile-answer">
-            <span className="label">Decision style</span>
+            <span className="label">Decision approach</span>
             <span className="value">
               {onboardingAnswers.decisionStyle || 'Not set'}
+            </span>
+          </GlassCard>
+          <GlassCard className="profile-answer">
+            <span className="label">Stress response</span>
+            <span className="value">{onboardingAnswers.neuroticismScore}/5</span>
+          </GlassCard>
+          <GlassCard className="profile-answer">
+            <span className="label">Views on expensive things</span>
+            <span className="value">{materialismAverage.toFixed(1)}/4</span>
+          </GlassCard>
+          <GlassCard className="profile-answer">
+            <span className="label">Sense of control</span>
+            <span className="value">{locusSummary}</span>
+          </GlassCard>
+          <GlassCard className="profile-answer">
+            <span className="label">Identity alignment</span>
+            <span className="value">
+              {onboardingAnswers.identityStability || 'Not set'}
             </span>
           </GlassCard>
         </div>
@@ -673,7 +724,9 @@ export default function Profile({ session }: ProfileProps) {
                         max="5"
                         step="1"
                         value={currentScore ?? 3}
-                        onChange={(e) => handleValueChange(option.value, Number(e.target.value))}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                          handleValueChange(option.value, Number(e.target.value))
+                        }
                         disabled={isSaving}
                         className="value-slider"
                       />
@@ -743,7 +796,9 @@ export default function Profile({ session }: ProfileProps) {
                     <div
                       className="verdict-card-clickable"
                       onClick={() => setSelectedVerdict(verdict)}
-                      onKeyDown={(e) => e.key === 'Enter' && setSelectedVerdict(verdict)}
+                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) =>
+                        e.key === 'Enter' && setSelectedVerdict(verdict)
+                      }
                       role="button"
                       tabIndex={0}
                     >
@@ -909,12 +964,12 @@ export default function Profile({ session }: ProfileProps) {
       {purchaseModalOpen && createPortal(
         <div
           className="modal-backdrop"
-          onClick={(event) => {
+          onClick={(event: MouseEvent<HTMLDivElement>) => {
             if (event.target === event.currentTarget) {
               setPurchaseModalOpen(false)
             }
           }}
-          onKeyDown={(event) => {
+          onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
             if (event.key === 'Escape') {
               setPurchaseModalOpen(false)
             }
@@ -942,7 +997,9 @@ export default function Profile({ session }: ProfileProps) {
                   <VolumetricInput
                     as="input"
                     value={purchaseTitle}
-                    onChange={(event) => setPurchaseTitle(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setPurchaseTitle(event.target.value)
+                    }
                     placeholder="Noise cancelling headphones"
                     required
                   />
@@ -955,7 +1012,9 @@ export default function Profile({ session }: ProfileProps) {
                     min={0}
                     step="0.01"
                     value={purchasePrice}
-                    onChange={(event) => setPurchasePrice(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setPurchasePrice(event.target.value)
+                    }
                     placeholder="129.00"
                     required
                   />
@@ -965,7 +1024,9 @@ export default function Profile({ session }: ProfileProps) {
                   <VolumetricInput
                     as="input"
                     value={purchaseVendor}
-                    onChange={(event) => setPurchaseVendor(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setPurchaseVendor(event.target.value)
+                    }
                     placeholder="Amazon"
                   />
                 </label>
@@ -975,7 +1036,9 @@ export default function Profile({ session }: ProfileProps) {
                     as="select"
                     className="purchase-select"
                     value={purchaseCategory || 'other'}
-                    onChange={(event) => setPurchaseCategory(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                      setPurchaseCategory(event.target.value)
+                    }
                   >
                     {PURCHASE_CATEGORIES.map((cat: { value: string; label: string }) => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -988,7 +1051,9 @@ export default function Profile({ session }: ProfileProps) {
                     as="input"
                     type="date"
                     value={purchaseDate}
-                    onChange={(event) => setPurchaseDate(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setPurchaseDate(event.target.value)
+                    }
                     required
                   />
                 </label>
@@ -1019,12 +1084,12 @@ export default function Profile({ session }: ProfileProps) {
       {profileModalOpen && createPortal(
         <div
           className="modal-backdrop"
-          onClick={(event) => {
+          onClick={(event: MouseEvent<HTMLDivElement>) => {
             if (event.target === event.currentTarget) {
               setProfileModalOpen(false)
             }
           }}
-          onKeyDown={(event) => {
+          onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
             if (event.key === 'Escape') {
               setProfileModalOpen(false)
             }
@@ -1053,7 +1118,9 @@ export default function Profile({ session }: ProfileProps) {
                   <VolumetricInput
                     as="textarea"
                     value={profileDraftSummary}
-                    onChange={(event) => setProfileDraftSummary(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                      setProfileDraftSummary(event.target.value)
+                    }
                     placeholder="The user prioritises financial stability and minimalism, often regrets impulse tech purchases, is most satisfied with durable functional items, and has a moderately deliberate decision style."
                     rows={4}
                   />
@@ -1070,7 +1137,9 @@ export default function Profile({ session }: ProfileProps) {
                     min={0}
                     step="0.01"
                     value={profileDraftBudget}
-                    onChange={(event) => setProfileDraftBudget(event.target.value)}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      setProfileDraftBudget(event.target.value)
+                    }
                     placeholder="120.00"
                   />
                 </label>
@@ -1154,7 +1223,7 @@ export default function Profile({ session }: ProfileProps) {
               </div>
 
               <div className="quiz-section">
-                <h3>4. Decision Style</h3>
+                <h3>4. How you decide</h3>
                 <p>Which best describes how you usually decide?</p>
                 <div className="quiz-options">
                   {decisionStyleOptions.map((option) => (
@@ -1177,85 +1246,97 @@ export default function Profile({ session }: ProfileProps) {
               </div>
 
               <div className="quiz-section">
-                <h3>5. Financial Sensitivity</h3>
-                <p>When spending money, I mostly feel…</p>
-                <div className="quiz-options">
-                  {financialSensitivityOptions.map((option) => (
-                    <LiquidButton
-                      key={option}
-                      type="button"
-                      className={`quiz-chip ${onboardingAnswers.financialSensitivity === option ? 'selected' : ''
-                        }`}
-                      onClick={() =>
-                        setOnboardingAnswers((prev) => ({
-                          ...prev,
-                          financialSensitivity: option,
-                        }))
-                      }
-                    >
-                      {option}
-                    </LiquidButton>
-                  ))}
-                </div>
+                <h3>5. Under stress</h3>
+                <p>
+                  I tend to experience negative emotions easily (e.g., worry, nervousness,
+                  tension, sadness), and I find it difficult to stay calm or emotionally steady
+                  under stress.
+                </p>
                 <div className="quiz-range">
                   <label>
-                    Spending money causes me stress
+                    Scale: 1 = Disagree a lot, 5 = Agree a lot
                     <input
                       type="range"
                       min="1"
                       max="5"
                       step="1"
-                      value={onboardingAnswers.spendingStressScore}
-                      onChange={(event) =>
+                      value={onboardingAnswers.neuroticismScore}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
                         setOnboardingAnswers((prev) => ({
                           ...prev,
-                          spendingStressScore: Number(event.target.value),
+                          neuroticismScore: Number(event.target.value),
                         }))
                       }
                     />
                   </label>
-                  <span className="range-value">
-                    {onboardingAnswers.spendingStressScore}
-                  </span>
+                  <span className="range-value">{onboardingAnswers.neuroticismScore}</span>
                 </div>
               </div>
 
               <div className="quiz-section">
-                <h3>6. Emotional Relationship to Buying</h3>
-                <p>Rate each 1–5</p>
-                {(['stability', 'excitement', 'control', 'reward'] as const).map((key) => (
-                  <div key={key} className="quiz-range">
+                <h3>6. Views on expensive things</h3>
+                <p>Rate each 1–4 (1 = No, not at all; 4 = Yes, very much).</p>
+                {materialismItems.map((item) => (
+                  <div key={item.key} className="quiz-range">
                     <label>
-                      {key === 'stability' && 'They help me feel more stable'}
-                      {key === 'excitement' && 'They help me feel excited'}
-                      {key === 'control' && 'They help me feel in control'}
-                      {key === 'reward' && 'They help me feel rewarded'}
+                      {item.prompt}
                       <input
                         type="range"
                         min="1"
-                        max="5"
+                        max="4"
                         step="1"
-                        value={onboardingAnswers.emotionalRelationship[key]}
-                        onChange={(event) =>
+                        value={onboardingAnswers.materialism[item.key]}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                           setOnboardingAnswers((prev) => ({
                             ...prev,
-                            emotionalRelationship: {
-                              ...prev.emotionalRelationship,
-                              [key]: Number(event.target.value),
+                            materialism: {
+                              ...prev.materialism,
+                              [item.key]: Number(event.target.value),
                             },
                           }))
                         }
                       />
                     </label>
                     <span className="range-value">
-                      {onboardingAnswers.emotionalRelationship[key]}
+                      {onboardingAnswers.materialism[item.key]}
                     </span>
                   </div>
                 ))}
               </div>
 
               <div className="quiz-section">
-                <h3>7. Identity Stability</h3>
+                <h3>7. Sense of control</h3>
+                <p>Scale: 1 = does not apply at all, 5 = applies completely.</p>
+                {locusOfControlItems.map((item) => (
+                  <div key={item.key} className="quiz-range">
+                    <label>
+                      {item.prompt}
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        step="1"
+                        value={onboardingAnswers.locusOfControl[item.key]}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                          setOnboardingAnswers((prev) => ({
+                            ...prev,
+                            locusOfControl: {
+                              ...prev.locusOfControl,
+                              [item.key]: Number(event.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <span className="range-value">
+                      {onboardingAnswers.locusOfControl[item.key]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="quiz-section">
+                <h3>8. Identity alignment</h3>
                 <p>
                   How important is it that your purchases reflect who you believe you are?
                 </p>
