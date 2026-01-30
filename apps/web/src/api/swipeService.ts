@@ -44,12 +44,14 @@ export async function createSwipe(
   timing: SwipeTiming,
   scheduleId: string
 ): Promise<{ error: string | null; isDuplicate: boolean }> {
+  const ratedAt = new Date().toISOString()
   const { error } = await supabase.from('swipes').insert({
     user_id: userId,
     purchase_id: purchaseId,
     schedule_id: scheduleId,
     timing,
     outcome,
+    rated_at: ratedAt,
   })
 
   if (error) {
@@ -62,7 +64,7 @@ export async function createSwipe(
 
   const { error: scheduleError } = await supabase
     .from('swipe_schedules')
-    .update({ completed_at: new Date().toISOString() })
+    .update({ completed_at: ratedAt })
     .eq('id', scheduleId)
     .eq('user_id', userId)
 

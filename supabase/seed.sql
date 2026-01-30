@@ -39,17 +39,19 @@ begin
       120.00,
       jsonb_build_object(
         'coreValues', jsonb_build_array('Financial stability', 'Minimalism / low clutter', 'Emotional wellbeing', 'Self-improvement', 'Convenience'),
-        'regretPatterns', jsonb_build_array('It duplicated something I already had', ),
+        'regretPatterns', jsonb_build_array('It duplicated something I already had'),
         'satisfactionPatterns', jsonb_build_array('Lasts a long time', 'Improves my daily routine', 'Makes life calmer or easier', 'Saves time or energy', 'Supports my growth or habits'),
         'decisionStyle', 'I plan carefully and delay',
-        'financialSensitivity', 'Balanced',
-      'spendingStressScore', 3,
-      'emotionalRelationship', jsonb_build_object(
-        'stability', 4,
-        'excitement', 4,
-        'control', 4,
-        'reward', 5
-      ),
+        'neuroticismScore', 2,
+        'materialism', jsonb_build_object(
+          'centrality', 3,
+          'happiness', 2,
+          'success', 2
+        ),
+        'locusOfControl', jsonb_build_object(
+          'workHard', 3,
+          'destiny', 2
+        ),
         'identityStability', 'Somewhat important'
       )
     );
@@ -73,13 +75,15 @@ begin
         'regretPatterns', jsonb_build_array('I bought impulsively'),
         'satisfactionPatterns', jsonb_build_array('Lasts a long time'),
         'decisionStyle', 'I plan carefully and delay',
-        'financialSensitivity', 'Very cautious',
-        'spendingStressScore', 0.7,
-        'emotionalRelationship', jsonb_build_object(
-          'stability', 2,
-          'excitement', 4,
-          'control', 4,
-          'reward', 5
+        'neuroticismScore', 4,
+        'materialism', jsonb_build_object(
+          'centrality', 2,
+          'happiness', 2,
+          'success', 1
+        ),
+        'locusOfControl', jsonb_build_object(
+          'workHard', 5,
+          'destiny', 2
         ),
         'identityStability', 'Somewhat important'
       )

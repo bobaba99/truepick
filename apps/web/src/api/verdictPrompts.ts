@@ -21,6 +21,8 @@ Vendor rubric to use when vendor data is provided:
 
 If vendor data is missing, treat vendor attributes as unknown and do not invent them.
 
+When evaluating, treat ratings within the last 30 days as signals for immediate regret risk, and ratings older than 6 months as signals for long-term satisfaction.
+
 You must respond with valid JSON only, no other text.`
 }
 
@@ -44,15 +46,21 @@ const formatVendorMatch = (vendorMatch: VendorMatch | null) => {
 export const buildUserPrompt = (
   input: PurchaseInput,
   profileContext: string,
-  similarPurchases: string,
+  similarRecentPurchases: string,
   recentPurchases: string,
+  similarLongTermPurchases: string,
+  longTermPurchases: string,
   vendorMatch: VendorMatch | null
 ) => {
   return `${profileContext}
 
-${similarPurchases}
-
+Immediate regret signals (ratings within last 30 days):
 ${recentPurchases}
+${similarRecentPurchases}
+
+Long-term satisfaction signals (ratings older than 6 months):
+${longTermPurchases}
+${similarLongTermPurchases}
 
 ${formatVendorMatch(vendorMatch)}
 
@@ -82,6 +90,15 @@ Output the final verdict and scoring in this exact JSON format:
     "score": <number 0-1>,
     "explanation": "<brief explanation, be friendly and neutral>"
   },
-  "rationale": "<2-3 sentence rationale. Walk through the user's values, purchase profile (recent/similar), and vendor quality/reliability/price tier when available. Refer to the rated scores, be friendly and neutral. When referencing values in brackets, use proper double quotes (\"\") not backticks.>"
+  "short_term_regret": {
+    "score": <number 0-1>,
+    "explanation": "<brief explanation of short-term regret risk, be friendly and neutral>"
+  },
+  "long_term_regret": {
+    "score": <number 0-1>,
+    "explanation": "<brief explanation of long-term regret risk, be friendly and neutral>"
+  },
+  "alternative_solution": "<2-3 sentences offering an alternative way to meet the same need if the verdict is hold/skip>",
+  "rationale": "<Write a personalized 3-4 sentence narrative explaining the recommendation. CRITICAL: Do not just list facts. Connect the evidence (price, vendor, history) directly to the decision. Example: 'We recommend holding because [Reason], which conflicts with your value of [Value].' Structure: (1) Outcome + Primary Reason. (2) Connection to User Profile/Values (quote values in <em> tags). (3) Supporting evidence from history/vendor. Use a warm, conversational tone.>"
 }`
 }

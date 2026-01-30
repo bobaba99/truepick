@@ -10,6 +10,7 @@ import {
   createVerdict,
   evaluatePurchase,
   updateVerdictDecision,
+  regenerateVerdict,
 } from '../api/verdictService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 
@@ -26,6 +27,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [recentVerdicts, setRecentVerdicts] = useState<VerdictRow[]>([])
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
+  const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
 
   // Form state
   const [title, setTitle] = useState('')
@@ -130,6 +132,28 @@ export default function Dashboard({ session }: DashboardProps) {
     await loadStats()
     await loadRecentVerdicts()
     setVerdictSavingId(null)
+  }
+
+  const handleVerdictRegenerate = async (verdict: VerdictRow) => {
+    if (!session) return
+
+    setVerdictRegeneratingId(verdict.id)
+    setStatus('')
+
+    const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
+    const { data, error } = await regenerateVerdict(session.user.id, verdict, openaiApiKey)
+
+    if (error) {
+      setStatus(error)
+      setVerdictRegeneratingId(null)
+      return
+    }
+
+    await loadRecentVerdicts()
+    if (data && selectedVerdict?.id === data.id) {
+      setSelectedVerdict(data)
+    }
+    setVerdictRegeneratingId(null)
   }
 
   return (
@@ -338,6 +362,14 @@ export default function Dashboard({ session }: DashboardProps) {
                         Skip
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => handleVerdictRegenerate(verdict)}
+                      disabled={verdictRegeneratingId === verdict.id}
+                    >
+                      {verdictRegeneratingId === verdict.id ? 'Regenerating...' : 'Regenerate'}
+                    </button>
                   </div>
                 </div>
               )
@@ -354,6 +386,8 @@ export default function Dashboard({ session }: DashboardProps) {
           verdict={selectedVerdict}
           isOpen={selectedVerdict !== null}
           onClose={() => setSelectedVerdict(null)}
+          onRegenerate={handleVerdictRegenerate}
+          isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />
       )}
     </section>

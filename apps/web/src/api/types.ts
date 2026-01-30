@@ -29,6 +29,7 @@ export type SwipeRow = {
   schedule_id?: string | null
   timing?: SwipeTiming | null
   outcome: SwipeOutcome
+  rated_at?: string | null
   created_at: string
 }
 
@@ -90,13 +91,15 @@ export type OnboardingAnswers = {
   regretPatterns: string[]
   satisfactionPatterns: string[]
   decisionStyle: string
-  financialSensitivity: string
-  spendingStressScore: number
-  emotionalRelationship: {
-    stability: number
-    excitement: number
-    control: number
-    reward: number
+  neuroticismScore: number
+  materialism: {
+    centrality: number
+    happiness: number
+    success: number
+  }
+  locusOfControl: {
+    workHard: number
+    destiny: number
   }
   identityStability: string
 }
@@ -150,6 +153,9 @@ export type LLMEvaluationReasoning = {
   financialStrain?: ScoreExplanation
   longTermUtility?: ScoreExplanation
   emotionalSupport?: ScoreExplanation
+  shortTermRegret?: ScoreExplanation
+  longTermRegret?: ScoreExplanation
+  alternativeSolution?: string
   decisionScore?: number
   rationale?: string
   importantPurchase?: boolean
@@ -175,6 +181,9 @@ export type LLMEvaluationResponse = {
   emotional_impulse: ScoreExplanation
   long_term_utility: ScoreExplanation
   emotional_support: ScoreExplanation
+  short_term_regret: ScoreExplanation
+  long_term_regret: ScoreExplanation
+  alternative_solution: string
   rationale: string
 }
 

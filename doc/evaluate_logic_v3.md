@@ -15,7 +15,7 @@
   - "I'm a cashier and undergraduate student, I'm thinking about saving for my tuition and eventually get a car."
   - Placeholder: “The user prioritises financial stability and minimalism, often regrets impulse tech purchases, is most satisfied with durable functional items, and has a moderately deliberate decision style. They are financially risk-averse and value purchases that provide long-term emotional stability rather than excitement.”
   - `My Decision Profile` for summary box and also make it into an onboarding quiz with a modal dialog
-```
+```markdown
 1. Core Values
 
 “Which of these matter most to you when buying something?”
@@ -84,39 +84,66 @@ It depends heavily on mood
 
 (You can map this to: deliberate → impulsive)
 
-5. Financial Sensitivity
+~~5. Financial Sensitivity~~
 
-“When spending money, I mostly feel…”
+~~“When spending money, I mostly feel…”~~
 
-Very cautious
+~~Very cautious~~
 
-Balanced
+~~Balanced~~
 
-Flexible
+~~Flexible~~
 
-Indifferent
+~~Indifferent~~
 
-Or numeric:
+~~Or numeric:~~
 
-“Spending money causes me stress” (1–5)
+~~“Spending money causes me stress” (1–5)~~
 
-6. Emotional Relationship to Buying
+5. Neuroticism (replace `Financial Sensitivity`)
 
-“What role do purchases play emotionally for you?”
+Item: "I tend to experience negative emotions easily (e.g., worry, nervousness, tension, sadness), and I find it difficult to stay calm or emotionally steady under stress."
 
-Rate each 1–5:
+Scale:
+1 — Disagree a lot
+2 — Disagree
+3 — Neither agree nor disagree
+4 — Agree
+5 — Agree a lot
 
-They help me feel more stable
+Finding: Higher neuroticism predicts stronger outcome and process regret in consumers.
 
-They help me feel excited
+~~6. Emotional Relationship to Buying~~
+~~“What role do purchases play emotionally for you?”~~
+~~Rate each 1–5:~~
+~~They help me feel more stable~~
+~~They help me feel excited~~
+~~They help me feel in control~~
+~~They help me feel rewarded~~
+~~This differentiates support vs stimulation.~~
 
-They help me feel in control
+6. Materialism (replace `Emotional Relationship to Buying`)
 
-They help me feel rewarded
+Scale: (1) no, not at all, (2) no, not really, (3) yes, a little, (4) yes, very much. Item scores were averaged to create scale scores
 
-This differentiates support vs stimulation.
+Items:
+- Material centrality: "Do you think it’s important to own expensive things?"
+- Material happiness: "Does buying expensive things make you happy?"
+- Material success: "Do you like people who have expensive things more than you like other people?"
 
-7. Identity Stability
+Finding: Materialistic, status‑driven, and compulsive buyers show higher post‑purchase regret.
+
+7. Locus of control (new addition)
+
+Scale: does not apply at all (1) to applies completely (5).
+
+Items:
+- "If I work hard, I will succeed."
+- "Destiny often gets in the way of my plans."
+
+Findings: People high in internal locus of control regret abnormal (norm‑violating) bad decisions more, because they feel more personally responsible; those low in internal control regret normal and abnormal decisions similarly.
+
+8. Identity Stability
 
 “How important is it that your purchases reflect who you believe you are?”
 
@@ -200,7 +227,6 @@ Very important
 
 ### Formula
 
-TODO: arbitarily decide the threshold with LLM-generated normal distribution data
 Outcome thresholds: score ≥ 0.7 → skip, ≥ 0.4 → hold, else buy.
 
 ``` latex

@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient'
 import type {
   EvaluationResult,
   LLMEvaluationResponse,
+  OnboardingAnswers,
   PurchaseInput,
   UserDecision,
   VerdictAlgorithm,
@@ -22,6 +23,46 @@ import {
   computeDecisionByAlgorithm,
   evaluatePurchaseFallback,
 } from './verdictScoring'
+import { clamp01 } from './utils'
+
+const normalizeLikert = (value: number, min: number, max: number) => {
+  if (Number.isNaN(value)) return 0
+  return clamp01((value - min) / (max - min))
+}
+
+const computePsychScores = (answers?: OnboardingAnswers | null) => {
+  if (!answers) {
+    return { neuroticism: 0, materialism: 0, locusOfControl: 0 }
+  }
+
+  const neuroticism =
+    typeof answers.neuroticismScore === 'number'
+      ? normalizeLikert(answers.neuroticismScore, 1, 5)
+      : 0
+
+  const materialismValues = answers.materialism
+    ? [
+        answers.materialism.centrality,
+        answers.materialism.happiness,
+        answers.materialism.success,
+      ]
+    : []
+  const materialismAverage =
+    materialismValues.length > 0
+      ? materialismValues.reduce((sum, value) => sum + value, 0) / materialismValues.length
+      : null
+  const materialism =
+    materialismAverage !== null ? normalizeLikert(materialismAverage, 1, 4) : 0
+
+  let locusOfControl = 0
+  if (answers.locusOfControl) {
+    const workHard = normalizeLikert(answers.locusOfControl.workHard, 1, 5)
+    const destiny = normalizeLikert(answers.locusOfControl.destiny, 1, 5)
+    locusOfControl = clamp01((workHard + (1 - destiny)) / 2)
+  }
+
+  return { neuroticism, materialism, locusOfControl }
+}
 
 export async function getRecentVerdict(userId: string): Promise<VerdictRow | null> {
   const { data, error } = await supabase
@@ -174,6 +215,62 @@ export async function createVerdict(
   return { error: error?.message ?? null }
 }
 
+export async function regenerateVerdict(
+  userId: string,
+  verdict: VerdictRow,
+  openaiApiKey?: string
+): Promise<{ data: VerdictRow | null; error: string | null }> {
+  const reasoning = verdict.reasoning as { importantPurchase?: boolean } | null
+  const input: PurchaseInput = {
+    title: verdict.candidate_title,
+    price: verdict.candidate_price ?? null,
+    category: verdict.candidate_category ?? null,
+    vendor: verdict.candidate_vendor ?? null,
+    justification: verdict.justification ?? null,
+    isImportant: reasoning?.importantPurchase ?? false,
+  }
+
+  const algorithm = verdict.scoring_model ?? 'standard'
+  const evaluation = await evaluatePurchase(userId, input, openaiApiKey, algorithm)
+  const vendorMatch = await retrieveVendorMatch(input)
+  const holdReleaseAt =
+    evaluation.outcome === 'hold'
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      : null
+
+  const { error } = await supabase
+    .from('verdicts')
+    .update({
+      candidate_vendor_id: vendorMatch?.vendor_id ?? null,
+      scoring_model: algorithm,
+      predicted_outcome: evaluation.outcome,
+      confidence_score: evaluation.confidence,
+      reasoning: evaluation.reasoning,
+      hold_release_at: holdReleaseAt,
+    })
+    .eq('id', verdict.id)
+    .eq('user_id', userId)
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  const { data, error: fetchError } = await supabase
+    .from('verdicts')
+    .select(
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
+    )
+    .eq('id', verdict.id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (fetchError) {
+    return { data: null, error: fetchError.message }
+  }
+
+  return { data: data as VerdictRow, error: null }
+}
+
 export async function evaluatePurchase(
   userId: string,
   input: PurchaseInput,
@@ -183,9 +280,13 @@ export async function evaluatePurchase(
   const vendorMatch = await retrieveVendorMatch(input)
   const { data: profile } = await supabase
     .from('users')
-    .select('weekly_fun_budget')
+    .select('weekly_fun_budget, onboarding_answers')
     .eq('id', userId)
     .maybeSingle()
+
+  const psychScores = computePsychScores(
+    (profile?.onboarding_answers as OnboardingAnswers | null | undefined) ?? null
+  )
 
   const financialStrainValue = computeFinancialStrain(
     input.price,
@@ -200,10 +301,18 @@ export async function evaluatePurchase(
   )
 
   const patternRepetition = await computePatternRepetition(userId, input.category ?? null)
-  const [profileContext, similarPurchases, recentPurchases] = await Promise.all([
+  const [
+    profileContext,
+    recentRatedPurchases,
+    similarRecentPurchases,
+    longTermRatedPurchases,
+    similarLongTermPurchases,
+  ] = await Promise.all([
     retrieveUserProfileContext(userId),
-    retrieveSimilarPurchases(userId, input, 5, openaiApiKey),
-    retrieveRecentPurchases(userId, 5),
+    retrieveRecentPurchases(userId, 5, { ratingWindow: 'recent' }),
+    retrieveSimilarPurchases(userId, input, 5, openaiApiKey, { ratingWindow: 'recent' }),
+    retrieveRecentPurchases(userId, 5, { ratingWindow: 'long_term' }),
+    retrieveSimilarPurchases(userId, input, 5, openaiApiKey, { ratingWindow: 'long_term' }),
   ])
 
   if (!openaiApiKey) {
@@ -213,8 +322,9 @@ export async function evaluatePurchase(
       financialStrain,
       vendorMatch,
       profileContextSummary: profileContext,
-      similarPurchasesSummary: similarPurchases,
-      recentPurchasesSummary: recentPurchases,
+      similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
+      recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
+      psychScores,
       algorithm,
     })
   }
@@ -224,8 +334,10 @@ export async function evaluatePurchase(
     const userPrompt = buildUserPrompt(
       input,
       profileContext,
-      similarPurchases,
-      recentPurchases,
+      similarRecentPurchases,
+      recentRatedPurchases,
+      similarLongTermPurchases,
+      longTermRatedPurchases,
       vendorMatch
     )
 
@@ -275,6 +387,14 @@ export async function evaluatePurchase(
       llmResponse.emotional_support.score,
       llmResponse.emotional_support.explanation
     )
+    const shortTermRegret = buildScore(
+      llmResponse.short_term_regret.score,
+      llmResponse.short_term_regret.explanation
+    )
+    const longTermRegret = buildScore(
+      llmResponse.long_term_regret.score,
+      llmResponse.long_term_regret.explanation
+    )
 
     const decisionResult = computeDecisionByAlgorithm(algorithm, {
       valueConflict: valueConflict.score,
@@ -283,6 +403,9 @@ export async function evaluatePurchase(
       financialStrain: financialStrain.score,
       longTermUtility: longTermUtility.score,
       emotionalSupport: emotionalSupport.score,
+      neuroticism: psychScores.neuroticism,
+      materialism: psychScores.materialism,
+      locusOfControl: psychScores.locusOfControl,
     })
 
     return {
@@ -295,6 +418,9 @@ export async function evaluatePurchase(
         financialStrain,
         longTermUtility,
         emotionalSupport,
+        shortTermRegret,
+        longTermRegret,
+        alternativeSolution: llmResponse.alternative_solution,
         decisionScore: decisionResult.decisionScore,
         rationale: llmResponse.rationale,
         importantPurchase: input.isImportant,
@@ -308,8 +434,9 @@ export async function evaluatePurchase(
       financialStrain,
       vendorMatch,
       profileContextSummary: profileContext,
-      similarPurchasesSummary: similarPurchases,
-      recentPurchasesSummary: recentPurchases,
+      similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
+      recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
+      psychScores,
       algorithm,
     })
   }

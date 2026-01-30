@@ -9,23 +9,35 @@ import type {
 import { clamp01 } from './utils'
 
 export const WEIGHTS = {
-  intercept: -1.208324,
-  value_conflict: 2.618259,
-  pattern_repetition: -2.507522,
-  emotional_impulse: 2.38308,
-  financial_strain: 0.933266,
-  long_term_utility: -2.730036,
-  emotional_support: -0.835071,
+  // Original 6 features
+  intercept: 0.627685,
+  value_conflict: 2.438147,
+  pattern_repetition: -2.792755,
+  emotional_impulse: 1.275967,
+  financial_strain: 0.982964,
+  longTerm_utility: -2.244344,
+  emotional_support: -1.444325,
+
+  // NEW: Personality traits
+  neuroticism: 1.919056,
+  materialism: 0.554621,
+  locus_of_control: 1.023947
 } as const
 
 const COST_SENSITIVE_WEIGHTS = {
-  intercept: -0.147321,
-  value_conflict: 2.667996,
-  pattern_repetition: -2.568795,
-  emotional_impulse: 2.353324,
-  financial_strain: 0.897642,
-  long_term_utility: -2.82861,
-  emotional_support: -0.938034,
+  // Original 6 features
+  intercept: 0.627685,
+  value_conflict: 2.438147,
+  pattern_repetition: -2.792755,
+  emotional_impulse: 1.275967,
+  financial_strain: 0.982964,
+  longTerm_utility: -2.244344,
+  emotional_support: -1.444325,
+
+  // NEW: Personality traits
+  neuroticism: 1.919056,
+  materialism: 0.554621,
+  locus_of_control: 1.023947
 } as const
 
 const COST_SENSITIVE_THRESHOLDS = {
@@ -38,15 +50,12 @@ const COST_SENSITIVE_CALIBRATION: Array<[number, number]> = [
   [0.1, 0.0],
   [0.2, 0.0],
   [0.3, 0.0],
-  [0.4, 0.18],
-  [0.45, 0.2],
-  [0.5, 0.22],
-  [0.55, 0.3],
-  [0.6, 0.42],
-  [0.7, 0.53],
+  [0.35, 0.2],
+  [0.45, 0.25],
+  [0.55, 0.35],
+  [0.65, 0.45],
   [0.75, 0.6],
-  [0.8, 0.72],
-  [0.9, 0.9],
+  [0.85, 0.8],
   [1.0, 1.0],
 ]
 
@@ -135,143 +144,50 @@ const buildVendorUtilityScore = (vendorMatch?: VendorMatch | null) => {
   return buildScore(utilityScore, explanation)
 }
 
-const LINE_BREAK = '<br />'
+const LINE_BREAK = '\n'
 
-const summarizeProfileContext = (summary?: string) => {
-  if (!summary) return null
-  if (summary.includes('Profile summary: not set.')) {
-    return 'Your profile summary is not set yet, so this leans more on the purchase details.'
-  }
-
-  const parts: string[] = []
-  const profileMatch = summary.match(/Profile summary:\n- (.+)/)
-  if (profileMatch?.[1]) {
-    const trimmed = profileMatch[1].trim().replace(/\.\s*$/, '')
-    parts.push(`Your profile summary notes: ${trimmed}.`)
+const parseProfileData = (summary?: string) => {
+  if (!summary || summary.includes('Profile summary: not set.')) return null
+  
+  const extract = (key: string) => {
+    const regex = new RegExp(`- ${key}.*: (.+)`)
+    const match = summary.match(regex)
+    return match?.[1]?.trim()
   }
 
   const budgetMatch = summary.match(/Weekly fun budget:\n- \\$([0-9.,]+)/)
-  if (budgetMatch?.[1]) {
-    parts.push(`Your weekly fun budget is $${budgetMatch[1]}.`)
-  }
+  const summaryMatch = summary.match(/Profile summary:\n- (.+)/)
 
-  const onboardingParts: string[] = []
-  const coreValuesMatch = summary.match(/- Core values: (.+)/)
-  if (coreValuesMatch?.[1]) {
-    onboardingParts.push(
-      `<strong>Core values:</strong> <em>"${coreValuesMatch[1]}"</em>.`
-    )
+  return {
+    summary: summaryMatch?.[1]?.trim(),
+    budget: budgetMatch?.[1]?.trim(),
+    coreValues: extract('Core values'),
+    regretPatterns: extract('Regret patterns'),
+    satisfactionPatterns: extract('Satisfaction patterns'),
+    decisionStyle: extract('Decision approach'),
   }
-  const regretMatch = summary.match(/- Regret patterns: (.+)/)
-  if (regretMatch?.[1]) {
-    onboardingParts.push(`<strong>Regret patterns:</strong> <em>"${regretMatch[1]}"</em>.`)
-  }
-  const satisfactionMatch = summary.match(/- Satisfaction patterns: (.+)/)
-  if (satisfactionMatch?.[1]) {
-    onboardingParts.push(`<strong>Satisfaction patterns:</strong> <em>"${satisfactionMatch[1]}"</em>.`)
-  }
-  const decisionStyleMatch = summary.match(/- Decision style: (.+)/)
-  if (decisionStyleMatch?.[1]) {
-    onboardingParts.push(`<strong>Decision style:</strong> <em>"${decisionStyleMatch[1]}"</em>.`)
-  }
-  const financialSensitivityMatch = summary.match(/- Financial sensitivity: (.+)/)
-  if (financialSensitivityMatch?.[1]) {
-    onboardingParts.push(
-      `<strong>Financial sensitivity:</strong> <em>"${financialSensitivityMatch[1]}"</em>.`
-    )
-  }
-  const identityMatch = summary.match(/- Identity stability: (.+)/)
-  if (identityMatch?.[1]) {
-    onboardingParts.push(`Identity stability:</strong> <em>"${identityMatch[1]}"</em>.`)
-  }
-  const emotionalMatch = summary.match(/- Emotional relationship: (.+)/)
-  if (emotionalMatch?.[1]) {
-    onboardingParts.push(
-      `<strong>Emotional relationship:</strong> <em>"${emotionalMatch[1]}"</em>.`
-    )
-  }
-
-  if (onboardingParts.length > 0) {
-    parts.push(...onboardingParts)
-  }
-
-  if (parts.length === 0) {
-    return 'Your profile context guides this decision alongside the purchase details.'
-  }
-
-  return parts.join(LINE_BREAK)
 }
 
-const extractBulletLines = (text?: string) => {
-  if (!text) return []
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('- '))
-    .map((line) => line.replace(/^- /, ''))
-}
+const buildAlternativeSolution = (input: PurchaseInput) => {
+  const suggestions: string[] = []
 
-const summarizePurchaseProfile = (similar?: string, recent?: string) => {
-  const parts: string[] = []
-  const hasRecent = extractBulletLines(recent).length > 0
-  const hasSimilar = extractBulletLines(similar).length > 0
-
-  if (hasRecent) {
-    parts.push('Past purchases suggest a baseline for your usual spending and categories.')
-  } else if (recent?.includes('No purchase history')) {
-    parts.push('Past purchases suggest limited recent history to compare against.')
+  if (!input.justification || input.justification.length < 20) {
+    suggestions.push('Write down the specific problem this solves and revisit it after 24 hours.')
   }
 
-  if (hasSimilar) {
-    parts.push('Similar purchases suggest how comparable items have felt for you before.')
-  } else if (similar?.includes('No similar purchases found')) {
-    parts.push('Similar purchases suggest there are no close historical matches yet.')
+  if (input.price !== null) {
+    suggestions.push('Try a lower-priced or second-hand option first, or set a price alert.')
   }
 
-  return parts.length > 0 ? parts.join(LINE_BREAK) : null
-}
-
-const summarizeVendorMatch = (vendorMatch?: VendorMatch | null) => {
-  if (!vendorMatch) {
-    return 'Vendor quality, reliability, and price tier are not available, so this relies on the item details.'
-  }
-  const rubric = getVendorRubricInfo(vendorMatch)
-  if (!rubric) {
-    return 'Vendor quality, reliability, and price tier are not available, so this relies on the item details.'
-  }
-  return `The vendor is rated ${vendorMatch.vendor_quality} on quality (${rubric.quality.score}) and ${vendorMatch.vendor_reliability} on reliability (${rubric.reliability.score}), with a ${vendorMatch.vendor_price_tier} price tier (${rubric.priceTier.typical_multiplier}).`
-}
-
-const summarizeRiskSignals = (
-  reasons: string[],
-  patternRepetition?: ScoreExplanation,
-  financialStrain?: ScoreExplanation
-) => {
-  const parts: string[] = []
-  if (reasons.length > 0) {
-    const normalizedReasons = reasons.map((reason) => reason.toLowerCase())
-    const [first, second, ...rest] = normalizedReasons
-    if (normalizedReasons.length === 1) {
-      parts.push(`On the item itself, ${first} stands out.`)
-    } else if (normalizedReasons.length === 2) {
-      parts.push(`On the item itself, ${first} and ${second} stand out.`)
-    } else {
-      parts.push(
-        `On the item itself, ${first} and ${second} stand out, plus ${rest.join(', ')}.`
-      )
-    }
+  if (suggestions.length === 0) {
+    suggestions.push('Try a smaller, reversible step such as borrowing, renting, or a trial.')
   }
 
-  if (patternRepetition) {
-    const explanation = patternRepetition.explanation.trim().replace(/\.\s*$/, '')
-    parts.push(`Pattern signal: ${explanation}.`)
-  }
-  if (financialStrain) {
-    const explanation = financialStrain.explanation.trim().replace(/\.\s*$/, '')
-    parts.push(`Budget context: ${explanation}.`)
+  if (suggestions.length === 1) {
+    suggestions.push('If it still feels essential later, you can proceed with more confidence.')
   }
 
-  return parts.length > 0 ? parts.join(LINE_BREAK) : null
+  return suggestions.slice(0, 2).join(' ')
 }
 
 export const buildScore = (score: number, explanation: string): ScoreExplanation => ({
@@ -286,6 +202,9 @@ export const computeDecisionScore = (params: {
   financialStrain: number
   longTermUtility: number
   emotionalSupport: number
+  neuroticism: number
+  materialism: number
+  locusOfControl: number
 }) => {
   return (
     WEIGHTS.intercept +
@@ -293,8 +212,11 @@ export const computeDecisionScore = (params: {
     WEIGHTS.pattern_repetition * params.patternRepetition +
     WEIGHTS.emotional_impulse * params.emotionalImpulse +
     WEIGHTS.financial_strain * params.financialStrain -
-    WEIGHTS.long_term_utility * params.longTermUtility -
-    WEIGHTS.emotional_support * params.emotionalSupport
+    WEIGHTS.longTerm_utility * params.longTermUtility -
+    WEIGHTS.emotional_support * params.emotionalSupport +
+    WEIGHTS.neuroticism * params.neuroticism +
+    WEIGHTS.materialism * params.materialism +
+    WEIGHTS.locus_of_control * params.locusOfControl
   )
 }
 
@@ -356,6 +278,9 @@ const computeCostSensitiveScore = (params: {
   financialStrain: number
   longTermUtility: number
   emotionalSupport: number
+  neuroticism: number
+  materialism: number
+  locusOfControl: number
 }) => {
   const logit =
     COST_SENSITIVE_WEIGHTS.intercept +
@@ -363,8 +288,11 @@ const computeCostSensitiveScore = (params: {
     COST_SENSITIVE_WEIGHTS.pattern_repetition * params.patternRepetition +
     COST_SENSITIVE_WEIGHTS.emotional_impulse * params.emotionalImpulse +
     COST_SENSITIVE_WEIGHTS.financial_strain * params.financialStrain +
-    COST_SENSITIVE_WEIGHTS.long_term_utility * params.longTermUtility +
-    COST_SENSITIVE_WEIGHTS.emotional_support * params.emotionalSupport
+    COST_SENSITIVE_WEIGHTS.longTerm_utility * params.longTermUtility +
+    COST_SENSITIVE_WEIGHTS.emotional_support * params.emotionalSupport +
+    COST_SENSITIVE_WEIGHTS.neuroticism * params.neuroticism +
+    COST_SENSITIVE_WEIGHTS.materialism * params.materialism +
+    COST_SENSITIVE_WEIGHTS.locus_of_control * params.locusOfControl
 
   const rawProb = sigmoid(logit)
   const calProb = calibrateProbability(rawProb)
@@ -380,6 +308,9 @@ export const computeDecisionByAlgorithm = (
     financialStrain: number
     longTermUtility: number
     emotionalSupport: number
+    neuroticism: number
+    materialism: number
+    locusOfControl: number
   }
 ) => {
   if (algorithm === 'cost_sensitive_iso') {
@@ -432,6 +363,11 @@ export const evaluatePurchaseFallback = (
     profileContextSummary?: string
     similarPurchasesSummary?: string
     recentPurchasesSummary?: string
+    psychScores?: {
+      neuroticism: number
+      materialism: number
+      locusOfControl: number
+    }
     algorithm?: VerdictAlgorithm
   }
 ): EvaluationResult => {
@@ -503,23 +439,66 @@ export const evaluatePurchaseFallback = (
       financialStrain: financialStrain.score,
       longTermUtility: longTermUtility.score,
       emotionalSupport: emotionalSupport.score,
+      neuroticism: overrides?.psychScores?.neuroticism ?? 0,
+      materialism: overrides?.psychScores?.materialism ?? 0,
+      locusOfControl: overrides?.psychScores?.locusOfControl ?? 0,
     }
   )
 
-  const rationaleParts = [
-    summarizeProfileContext(overrides?.profileContextSummary),
-    summarizePurchaseProfile(
-      overrides?.similarPurchasesSummary,
-      overrides?.recentPurchasesSummary
-    ),
-    summarizeVendorMatch(overrides?.vendorMatch),
-    summarizeRiskSignals(reasons, patternRepetition, financialStrain),
-  ].filter(Boolean)
+  const alternativeSolution =
+    decisionResult.outcome === 'buy' ? null : buildAlternativeSolution(input)
 
-  const rationale =
-    rationaleParts.length > 0
-      ? rationaleParts.join(LINE_BREAK)
-      : 'This recommendation leans on the purchase details because profile context is limited.'
+  const outcomeMessage =
+    decisionResult.outcome === 'buy'
+      ? 'This purchase is recommended'
+      : decisionResult.outcome === 'hold'
+        ? 'Holding for 24 hours is recommended'
+        : 'Skipping this purchase is recommended'
+
+  // Build narrative rationale
+  const profile = parseProfileData(overrides?.profileContextSummary)
+  let rationale = outcomeMessage
+
+  // 1. Primary Reason
+  if (reasons.length > 0) {
+    const mainReasons = reasons.map((r) => r.toLowerCase()).join(' and ')
+    rationale += ` primarily because ${mainReasons}.`
+  } else {
+    rationale += ' as it aligns with your typical spending baseline.'
+  }
+
+  // 2. Profile Connection
+  if (profile) {
+    rationale += ' '
+    if (decisionResult.outcome !== 'buy') {
+      if (
+        profile.regretPatterns &&
+        reasons.some((r) => r.includes('impulse') || r.includes('urgency'))
+      ) {
+        rationale += `This mirrors your regret pattern of "${profile.regretPatterns}".`
+      } else if (profile.coreValues) {
+        rationale += `This may conflict with your core values of <em>${profile.coreValues}</em>.`
+      } else {
+        rationale += `This contrasts with your profile focus on ${profile.summary || 'stability'}.`
+      }
+    } else {
+      if (profile.satisfactionPatterns) {
+        rationale += `This aligns with your satisfaction pattern: "${profile.satisfactionPatterns}".`
+      } else if (profile.coreValues) {
+        rationale += `This supports your values of <em>${profile.coreValues}</em>.`
+      }
+    }
+
+    if (profile.budget && financialStrain.score > 0.5) {
+      rationale += ` Additionally, the price is significant relative to your weekly budget of $${profile.budget}.`
+    }
+  }
+
+  // 3. Vendor/History
+  if (overrides?.vendorMatch) {
+    const v = overrides.vendorMatch
+    rationale += ` The vendor ${v.vendor_name} is rated ${v.vendor_quality} quality.`
+  }
 
   return {
     outcome: decisionResult.outcome,
@@ -532,6 +511,7 @@ export const evaluatePurchaseFallback = (
       longTermUtility,
       emotionalSupport,
       decisionScore: decisionResult.decisionScore,
+      alternativeSolution: alternativeSolution ?? undefined,
       rationale,
       importantPurchase: input.isImportant,
       algorithm: overrides?.algorithm ?? 'standard',

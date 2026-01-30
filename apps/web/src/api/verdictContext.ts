@@ -12,7 +12,7 @@ type PurchaseWithSwipe = {
   vendor: string | null
   purchase_date: string
   verdict_id: string | null
-  swipes: { outcome: string }[]
+  swipes: { outcome: string; timing?: string | null; rated_at?: string | null }[]
   verdicts: { justification: string | null } | null
 }
 
@@ -81,15 +81,77 @@ export const retrieveVendorMatch = async (
   return match
 }
 
+type RatingWindow = 'recent' | 'long_term'
+
+const buildSwipeSummary = (
+  swipes?: { outcome: string; timing?: string | null; rated_at?: string | null }[]
+) => {
+  const summary = {
+    day3: 'not yet rated',
+    week3: 'not yet rated',
+    month3: 'not yet rated',
+  }
+
+  swipes?.forEach((swipe) => {
+    if (!swipe.timing) return
+    if (swipe.timing === 'day3') summary.day3 = swipe.outcome ?? 'not yet rated'
+    if (swipe.timing === 'week3') summary.week3 = swipe.outcome ?? 'not yet rated'
+    if (swipe.timing === 'month3') summary.month3 = swipe.outcome ?? 'not yet rated'
+  })
+
+  return `ratings: day3=${summary.day3}, week3=${summary.week3}, month3=${summary.month3}`
+}
+
+const getLatestRatedAt = (swipes?: { rated_at?: string | null }[]) => {
+  if (!swipes || swipes.length === 0) return null
+  const dates = swipes
+    .map((swipe) => (swipe.rated_at ? new Date(swipe.rated_at) : null))
+    .filter((date): date is Date => Boolean(date))
+
+  if (dates.length === 0) return null
+  return new Date(Math.max(...dates.map((date) => date.getTime())))
+}
+
+const filterPurchasesByRatingWindow = (
+  purchases: PurchaseWithSwipe[],
+  window?: RatingWindow
+) => {
+  if (!window) return purchases
+
+  const now = new Date()
+  const cutoffRecent = new Date(now)
+  cutoffRecent.setDate(cutoffRecent.getDate() - 30)
+  const cutoffLongTerm = new Date(now)
+  cutoffLongTerm.setMonth(cutoffLongTerm.getMonth() - 6)
+
+  return purchases.filter((purchase) => {
+    const latestRated = getLatestRatedAt(purchase.swipes)
+    if (!latestRated) return false
+    if (window === 'recent') return latestRated >= cutoffRecent
+    return latestRated <= cutoffLongTerm
+  })
+}
+
+const sortByLatestRatedAt = (purchases: PurchaseWithSwipe[]) => {
+  return [...purchases].sort((a, b) => {
+    const aRated = getLatestRatedAt(a.swipes)
+    const bRated = getLatestRatedAt(b.swipes)
+    if (!aRated && !bRated) return 0
+    if (!aRated) return 1
+    if (!bRated) return -1
+    return bRated.getTime() - aRated.getTime()
+  })
+}
+
 const formatPurchaseString = (purchase: PurchaseWithSwipe): string => {
-  const outcome = purchase.swipes?.[0]?.outcome ?? 'not rated'
+  const swipeSummary = buildSwipeSummary(purchase.swipes)
   const motive = purchase.verdicts?.justification
   const parts = [
     `- ${purchase.title}`,
     `$${Number(purchase.price).toFixed(2)}`,
     purchase.category ?? 'uncategorized',
     purchase.vendor ?? 'unknown vendor',
-    outcome,
+    swipeSummary,
   ]
   if (motive) {
     parts.push(`"${motive}"`)
@@ -129,7 +191,7 @@ const fetchPurchaseContext = async (userId: string) => {
     .select(
       `
       id, title, price, category, vendor, purchase_date, verdict_id,
-      swipes (outcome),
+      swipes (outcome, timing, rated_at),
       verdicts (justification)
     `
     )
@@ -148,11 +210,21 @@ export async function retrieveSimilarPurchases(
   userId: string,
   input: PurchaseInput,
   limit = 5,
-  openaiApiKey?: string
+  openaiApiKey?: string,
+  options?: { ratingWindow?: RatingWindow }
 ): Promise<string> {
-  const purchases = await fetchPurchaseContext(userId)
+  const purchases = filterPurchasesByRatingWindow(
+    await fetchPurchaseContext(userId),
+    options?.ratingWindow
+  )
 
   if (purchases.length === 0) {
+    if (options?.ratingWindow === 'recent') {
+      return 'No similar purchases found from ratings in the last 30 days.'
+    }
+    if (options?.ratingWindow === 'long_term') {
+      return 'No similar purchases found from ratings older than 6 months.'
+    }
     return 'No similar purchases found.'
   }
 
@@ -190,7 +262,13 @@ export async function retrieveSimilarPurchases(
     }
 
     const lines = topMatches.map(formatPurchaseString)
-    return `Similar purchases (semantic match):\n${lines.join('\n')}`
+    const label =
+      options?.ratingWindow === 'recent'
+        ? 'Similar purchases rated in the last 30 days (semantic match):'
+        : options?.ratingWindow === 'long_term'
+          ? 'Similar purchases rated over 6 months ago (semantic match):'
+          : 'Similar purchases (semantic match):'
+    return `${label}\n${lines.join('\n')}`
   } catch (embeddingError) {
     console.warn('Embedding lookup failed, falling back to category match.', embeddingError)
     if (!input.category) {
@@ -200,37 +278,67 @@ export async function retrieveSimilarPurchases(
       (purchase) => purchase.category === input.category
     )
     if (categoryMatches.length === 0) {
+      if (options?.ratingWindow === 'recent') {
+        return 'No similar purchases found from ratings in the last 30 days.'
+      }
+      if (options?.ratingWindow === 'long_term') {
+        return 'No similar purchases found from ratings older than 6 months.'
+      }
       return 'No similar purchases found.'
     }
     const lines = categoryMatches.slice(0, limit).map(formatPurchaseString)
-    return `Similar purchases in "${input.category}":\n${lines.join('\n')}`
+    const label =
+      options?.ratingWindow === 'recent'
+        ? `Similar purchases rated in the last 30 days (category "${input.category}"):\n`
+        : options?.ratingWindow === 'long_term'
+          ? `Similar purchases rated over 6 months ago (category "${input.category}"):\n`
+          : `Similar purchases in "${input.category}":\n`
+    return `${label}${lines.join('\n')}`
   }
 }
 
 export async function retrieveRecentPurchases(
   userId: string,
-  limit = 5
+  limit = 5,
+  options?: { ratingWindow?: RatingWindow }
 ): Promise<string> {
   const { data, error } = await supabase
     .from('purchases')
     .select(
       `
       id, title, price, category, vendor, purchase_date, verdict_id,
-      swipes (outcome),
+      swipes (outcome, timing, rated_at),
       verdicts (justification)
     `
     )
     .eq('user_id', userId)
     .order('purchase_date', { ascending: false })
-    .limit(limit)
+    .limit(40)
 
   if (error || !data || data.length === 0) {
     return 'No purchase history found.'
   }
 
-  const purchases = data as unknown as PurchaseWithSwipe[]
-  const lines = purchases.map(formatPurchaseString)
-  return `Recent purchases:\n${lines.join('\n')}`
+  const purchases = sortByLatestRatedAt(
+    filterPurchasesByRatingWindow(data as unknown as PurchaseWithSwipe[], options?.ratingWindow)
+  )
+  if (purchases.length === 0) {
+    if (options?.ratingWindow === 'recent') {
+      return 'No recent ratings found in the last 30 days.'
+    }
+    if (options?.ratingWindow === 'long_term') {
+      return 'No long-term ratings found (older than 6 months).'
+    }
+  }
+
+  const lines = purchases.slice(0, limit).map(formatPurchaseString)
+  const label =
+    options?.ratingWindow === 'recent'
+      ? 'Recent rated purchases (last 30 days):'
+      : options?.ratingWindow === 'long_term'
+        ? 'Long-term rated purchases (over 6 months ago):'
+        : 'Recent purchases:'
+  return `${label}\n${lines.join('\n')}`
 }
 
 export async function retrieveUserProfileContext(userId: string): Promise<string> {
@@ -270,21 +378,26 @@ export async function retrieveUserProfileContext(userId: string): Promise<string
         )
       }
       if (onboarding.decisionStyle) {
-        onboardingLines.push(`- Decision style: ${onboarding.decisionStyle}`)
+        onboardingLines.push(`- Decision approach: ${onboarding.decisionStyle}`)
       }
-      if (onboarding.financialSensitivity) {
-        onboardingLines.push(`- Financial sensitivity: ${onboarding.financialSensitivity}`)
-      }
-      if (typeof onboarding.spendingStressScore === 'number') {
-        onboardingLines.push(`- Spending stress score: ${onboarding.spendingStressScore}/5`)
+      if (typeof onboarding.neuroticismScore === 'number') {
+        onboardingLines.push(
+          `- Stress response statement (1-5): ${onboarding.neuroticismScore}/5`
+        )
       }
       if (onboarding.identityStability) {
-        onboardingLines.push(`- Identity stability: ${onboarding.identityStability}`)
+        onboardingLines.push(`- Identity alignment: ${onboarding.identityStability}`)
       }
-      if (onboarding.emotionalRelationship) {
-        const { stability, excitement, control, reward } = onboarding.emotionalRelationship
+      if (onboarding.materialism) {
+        const { centrality, happiness, success } = onboarding.materialism
         onboardingLines.push(
-          `- Emotional relationship: stability ${stability}/5, excitement ${excitement}/5, control ${control}/5, reward ${reward}/5`
+          `- Views on expensive things (1-4): centrality ${centrality}/4, happiness ${happiness}/4, success ${success}/4`
+        )
+      }
+      if (onboarding.locusOfControl) {
+        const { workHard, destiny } = onboarding.locusOfControl
+        onboardingLines.push(
+          `- Sense of control (1-5): work hard → succeed ${workHard}/5, destiny gets in the way ${destiny}/5`
         )
       }
       if (onboardingLines.length > 0) {

@@ -1696,6 +1696,12 @@
   gap: 1rem;
 }
 
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .modal-header h2 {
   margin: 0;
   font-size: 1.4rem;
@@ -1833,7 +1839,22 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
+.analysis-card--compact {
+  min-height: auto;
+  height: auto;
+}
+
 .analysis-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.analysis-card--hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.analysis-card--hover:hover {
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
@@ -1904,6 +1925,10 @@
   font-size: 0.9rem;
   color: var(--ink-600);
   line-height: 1.5;
+}
+
+.rationale-text {
+  white-space: pre-line;
 }
 
 /* Clickable verdict cards */

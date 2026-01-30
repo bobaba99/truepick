@@ -21,7 +21,12 @@ import {
   updateUserValue,
   deleteUserValue,
 } from '../api/userValueService'
-import { getVerdictHistory, updateVerdictDecision, deleteVerdict } from '../api/verdictService'
+import {
+  getVerdictHistory,
+  updateVerdictDecision,
+  deleteVerdict,
+  regenerateVerdict,
+} from '../api/verdictService'
 import {
   getPurchaseHistory,
   createPurchase,
@@ -100,31 +105,52 @@ const decisionStyleOptions = [
   'It depends heavily on mood',
 ]
 
-const financialSensitivityOptions = [
-  'Very cautious',
-  'Balanced',
-  'Flexible',
-  'Indifferent',
-]
-
 const identityStabilityOptions = [
   'Not important',
   'Somewhat important',
   'Very important',
 ]
 
+const materialismItems = [
+  {
+    key: 'centrality',
+    prompt: "Do you think it's important to own expensive things?",
+  },
+  {
+    key: 'happiness',
+    prompt: 'Does buying expensive things make you happy?',
+  },
+  {
+    key: 'success',
+    prompt: 'Do you like people who have expensive things more than you like other people?',
+  },
+] as const
+
+const locusOfControlItems = [
+  {
+    key: 'workHard',
+    prompt: 'If I work hard, I will succeed.',
+  },
+  {
+    key: 'destiny',
+    prompt: 'Destiny often gets in the way of my plans.',
+  },
+] as const
+
 const DEFAULT_ONBOARDING: OnboardingAnswers = {
   coreValues: [],
   regretPatterns: [],
   satisfactionPatterns: [],
   decisionStyle: '',
-  financialSensitivity: '',
-  spendingStressScore: 3,
-  emotionalRelationship: {
-    stability: 3,
-    excitement: 3,
-    control: 3,
-    reward: 3,
+  neuroticismScore: 3,
+  materialism: {
+    centrality: 2,
+    happiness: 2,
+    success: 2,
+  },
+  locusOfControl: {
+    workHard: 3,
+    destiny: 3,
   },
   identityStability: '',
 }
@@ -139,9 +165,13 @@ const normalizeOnboardingAnswers = (
     coreValues: answers.coreValues ?? [],
     regretPatterns: answers.regretPatterns ?? [],
     satisfactionPatterns: answers.satisfactionPatterns ?? [],
-    emotionalRelationship: {
-      ...DEFAULT_ONBOARDING.emotionalRelationship,
-      ...answers.emotionalRelationship,
+    materialism: {
+      ...DEFAULT_ONBOARDING.materialism,
+      ...answers.materialism,
+    },
+    locusOfControl: {
+      ...DEFAULT_ONBOARDING.locusOfControl,
+      ...answers.locusOfControl,
     },
   }
 }
@@ -163,6 +193,7 @@ export default function Profile({ session }: ProfileProps) {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [purchaseModalMode, setPurchaseModalMode] = useState<'add' | 'edit'>('add')
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
+  const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
   const [editingValues, setEditingValues] = useState(false)
   const [profileSummary, setProfileSummary] = useState('')
@@ -212,6 +243,14 @@ export default function Profile({ session }: ProfileProps) {
     if (purchaseSearch && !matchesSearch(p.title, purchaseSearch)) return false
     return matchesFilters(p, purchaseFilters)
   })
+
+  const materialismAverage =
+    (onboardingAnswers.materialism.centrality +
+      onboardingAnswers.materialism.happiness +
+      onboardingAnswers.materialism.success) /
+    3
+
+  const locusSummary = `Work hard → succeed: ${onboardingAnswers.locusOfControl.workHard}/5, Destiny gets in the way: ${onboardingAnswers.locusOfControl.destiny}/5`
 
   const loadProfile = async () => {
     if (!session) return
@@ -551,6 +590,28 @@ export default function Profile({ session }: ProfileProps) {
     setVerdictSavingId(null)
   }
 
+  const handleVerdictRegenerate = async (verdict: VerdictRow) => {
+    if (!session) return
+
+    setVerdictRegeneratingId(verdict.id)
+    setStatus('')
+
+    const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
+    const { data, error } = await regenerateVerdict(session.user.id, verdict, openaiApiKey)
+
+    if (error) {
+      setStatus(error)
+      setVerdictRegeneratingId(null)
+      return
+    }
+
+    await loadVerdicts()
+    if (data && selectedVerdict?.id === data.id) {
+      setSelectedVerdict(data)
+    }
+    setVerdictRegeneratingId(null)
+  }
+
   return (
     <section className="route-content">
       <h1>Profile</h1>
@@ -625,9 +686,27 @@ export default function Profile({ session }: ProfileProps) {
             </span>
           </div>
           <div className="profile-answer">
-            <span className="label">Decision style</span>
+            <span className="label">Decision approach</span>
             <span className="value">
               {onboardingAnswers.decisionStyle || 'Not set'}
+            </span>
+          </div>
+          <div className="profile-answer">
+            <span className="label">Stress response</span>
+            <span className="value">{onboardingAnswers.neuroticismScore}/5</span>
+          </div>
+          <div className="profile-answer">
+            <span className="label">Views on expensive things</span>
+            <span className="value">{materialismAverage.toFixed(1)}/4</span>
+          </div>
+          <div className="profile-answer">
+            <span className="label">Sense of control</span>
+            <span className="value">{locusSummary}</span>
+          </div>
+          <div className="profile-answer">
+            <span className="label">Identity alignment</span>
+            <span className="value">
+              {onboardingAnswers.identityStability || 'Not set'}
             </span>
           </div>
         </div>
@@ -797,6 +876,14 @@ export default function Profile({ session }: ProfileProps) {
                       </div>
                       <button
                         type="button"
+                        className="ghost"
+                        onClick={() => handleVerdictRegenerate(verdict)}
+                        disabled={verdictRegeneratingId === verdict.id}
+                      >
+                        {verdictRegeneratingId === verdict.id ? 'Regenerating...' : 'Regenerate'}
+                      </button>
+                      <button
+                        type="button"
                         className="link danger"
                         onClick={() => handleVerdictDelete(verdict.id)}
                         disabled={isSaving}
@@ -901,6 +988,8 @@ export default function Profile({ session }: ProfileProps) {
           verdict={selectedVerdict}
           isOpen={selectedVerdict !== null}
           onClose={() => setSelectedVerdict(null)}
+          onRegenerate={handleVerdictRegenerate}
+          isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />,
         document.body
       )}
@@ -1148,7 +1237,7 @@ export default function Profile({ session }: ProfileProps) {
               </div>
 
               <div className="quiz-section">
-                <h3>4. Decision Style</h3>
+                <h3>4. How you decide</h3>
                 <p>Which best describes how you usually decide?</p>
                 <div className="quiz-options">
                   {decisionStyleOptions.map((option) => (
@@ -1171,88 +1260,98 @@ export default function Profile({ session }: ProfileProps) {
               </div>
 
               <div className="quiz-section">
-                <h3>5. Financial Sensitivity</h3>
-                <p>When spending money, I mostly feel…</p>
-                <div className="quiz-options">
-                  {financialSensitivityOptions.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`quiz-chip ${onboardingAnswers.financialSensitivity === option ? 'selected' : ''
-                        }`}
-                      onClick={() =>
-                        setOnboardingAnswers((prev) => ({
-                          ...prev,
-                          financialSensitivity: option,
-                        }))
-                      }
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
+                <h3>5. Under stress</h3>
+                <p>
+                  I tend to experience negative emotions easily (e.g., worry, nervousness,
+                  tension, sadness), and I find it difficult to stay calm or emotionally steady
+                  under stress.
+                </p>
                 <div className="quiz-range">
                   <label>
-                    Spending money causes me stress
+                    Scale: 1 = Disagree a lot, 5 = Agree a lot
                     <input
                       type="range"
                       min="1"
                       max="5"
                       step="1"
-                      value={onboardingAnswers.spendingStressScore}
+                      value={onboardingAnswers.neuroticismScore}
                       onChange={(event) =>
                         setOnboardingAnswers((prev) => ({
                           ...prev,
-                          spendingStressScore: Number(event.target.value),
+                          neuroticismScore: Number(event.target.value),
                         }))
                       }
                     />
                   </label>
-                  <span className="range-value">
-                    {onboardingAnswers.spendingStressScore}
-                  </span>
+                  <span className="range-value">{onboardingAnswers.neuroticismScore}</span>
                 </div>
               </div>
 
               <div className="quiz-section">
-                <h3>6. Emotional Relationship to Buying</h3>
-                <p>Rate each 1–5</p>
-                {(['stability', 'excitement', 'control', 'reward'] as const).map((key) => (
-                  <div key={key} className="quiz-range">
+                <h3>6. Views on expensive things</h3>
+                <p>Rate each 1–4 (1 = No, not at all; 4 = Yes, very much).</p>
+                {materialismItems.map((item) => (
+                  <div key={item.key} className="quiz-range">
                     <label>
-                      {key === 'stability' && 'They help me feel more stable'}
-                      {key === 'excitement' && 'They help me feel excited'}
-                      {key === 'control' && 'They help me feel in control'}
-                      {key === 'reward' && 'They help me feel rewarded'}
+                      {item.prompt}
                       <input
                         type="range"
                         min="1"
-                        max="5"
+                        max="4"
                         step="1"
-                        value={onboardingAnswers.emotionalRelationship[key]}
+                        value={onboardingAnswers.materialism[item.key]}
                         onChange={(event) =>
                           setOnboardingAnswers((prev) => ({
                             ...prev,
-                            emotionalRelationship: {
-                              ...prev.emotionalRelationship,
-                              [key]: Number(event.target.value),
+                            materialism: {
+                              ...prev.materialism,
+                              [item.key]: Number(event.target.value),
                             },
                           }))
                         }
                       />
                     </label>
                     <span className="range-value">
-                      {onboardingAnswers.emotionalRelationship[key]}
+                      {onboardingAnswers.materialism[item.key]}
                     </span>
                   </div>
                 ))}
               </div>
 
               <div className="quiz-section">
-                <h3>7. Identity Stability</h3>
-                <p>
-                  How important is it that your purchases reflect who you believe you are?
-                </p>
+                <h3>7. Sense of control</h3>
+                <p>Scale: 1 = does not apply at all, 5 = applies completely.</p>
+                {locusOfControlItems.map((item) => (
+                  <div key={item.key} className="quiz-range">
+                    <label>
+                      {item.prompt}
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        step="1"
+                        value={onboardingAnswers.locusOfControl[item.key]}
+                        onChange={(event) =>
+                          setOnboardingAnswers((prev) => ({
+                            ...prev,
+                            locusOfControl: {
+                              ...prev.locusOfControl,
+                              [item.key]: Number(event.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <span className="range-value">
+                      {onboardingAnswers.locusOfControl[item.key]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="quiz-section">
+                <h3>8. Identity alignment</h3>
+                <p>How important is it that your purchases reflect who you believe you are?</p>
                 <div className="quiz-options">
                   {identityStabilityOptions.map((option) => (
                     <button

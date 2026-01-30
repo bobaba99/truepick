@@ -5,6 +5,8 @@ type VerdictDetailModalProps = {
   verdict: VerdictRow
   isOpen: boolean
   onClose: () => void
+  onRegenerate?: (verdict: VerdictRow) => void
+  isRegenerating?: boolean
 }
 
 type ReasoningData = {
@@ -32,6 +34,15 @@ type ReasoningData = {
     score: number
     explanation: string
   }
+  shortTermRegret?: {
+    score: number
+    explanation: string
+  }
+  longTermRegret?: {
+    score: number
+    explanation: string
+  }
+  alternativeSolution?: string
   decisionScore?: number
   rationale?: string
   importantPurchase?: boolean
@@ -49,11 +60,19 @@ export default function VerdictDetailModal({
   verdict,
   isOpen,
   onClose,
+  onRegenerate,
+  isRegenerating = false,
 }: VerdictDetailModalProps) {
   if (!isOpen) return null
 
   const reasoning = verdict.reasoning as ReasoningData | null
   const isImportant = reasoning?.importantPurchase === true
+  const rationale = reasoning?.rationale
+    ? sanitizeVerdictRationaleHtml(reasoning.rationale)
+    : null
+  const alternativeSolution = reasoning?.alternativeSolution
+    ? sanitizeVerdictRationaleHtml(reasoning.alternativeSolution)
+    : null
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -79,14 +98,26 @@ export default function VerdictDetailModal({
       <div className="modal-content">
         <div className="modal-header">
           <h2>{verdict.candidate_title}</h2>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            aria-label="Close modal"
-          >
-            ×
-          </button>
+          <div className="modal-actions">
+            {onRegenerate && (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => onRegenerate(verdict)}
+                disabled={isRegenerating}
+              >
+                {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="modal-close"
+              onClick={onClose}
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="modal-body">
@@ -163,6 +194,39 @@ export default function VerdictDetailModal({
           {reasoning && (
             <div className="detail-section">
               <h3>AI Analysis</h3>
+
+              {typeof reasoning.decisionScore === 'number' && (
+                <div className="analysis-item analysis-item--decision analysis-card--hover">
+                  <div className="analysis-header">
+                    <span className="analysis-label">Decision Score</span>
+                    <span className="analysis-score">{reasoning.decisionScore.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {rationale && (
+                <div className="analysis-item analysis-card--hover">
+                  <div className="analysis-header">
+                    <span className="analysis-label">Rationale</span>
+                  </div>
+                  <p
+                    className="analysis-explanation rationale-text"
+                    dangerouslySetInnerHTML={{ __html: rationale }}
+                  />
+                </div>
+              )}
+
+              {alternativeSolution && (
+                <div className="analysis-item analysis-card--hover analysis-card--compact">
+                  <div className="analysis-header">
+                    <span className="analysis-label">Alternative solution</span>
+                  </div>
+                  <p
+                    className="analysis-explanation rationale-text"
+                    dangerouslySetInnerHTML={{ __html: alternativeSolution }}
+                  />
+                </div>
+              )}
 
               <div className="analysis-grid">
                 {(reasoning.valueConflict ?? reasoning.valueConflictScore) && (
@@ -248,30 +312,35 @@ export default function VerdictDetailModal({
                     </p>
                   </div>
                 )}
+
+                {reasoning.shortTermRegret && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Short-Term Regret</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.shortTermRegret.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.shortTermRegret.explanation}
+                    </p>
+                  </div>
+                )}
+
+                {reasoning.longTermRegret && (
+                  <div className="analysis-item analysis-card">
+                    <div className="analysis-header">
+                      <span className="analysis-label">Long-Term Regret</span>
+                    </div>
+                    <span className="analysis-score">
+                      {reasoning.longTermRegret.score.toFixed(2)}
+                    </span>
+                    <p className="analysis-explanation">
+                      {reasoning.longTermRegret.explanation}
+                    </p>
+                  </div>
+                )}
               </div>
-
-              {typeof reasoning.decisionScore === 'number' && (
-                <div className="analysis-item analysis-item--decision">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Decision Score</span>
-                    <span className="analysis-score">{reasoning.decisionScore.toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-
-              {reasoning.rationale && (
-                <div className="analysis-item">
-                  <div className="analysis-header">
-                    <span className="analysis-label">Rationale</span>
-                  </div>
-                  <p
-                    className="analysis-explanation"
-                    dangerouslySetInnerHTML={{
-                      __html: sanitizeVerdictRationaleHtml(reasoning.rationale),
-                    }}
-                  />
-                </div>
-              )}
             </div>
           )}
 

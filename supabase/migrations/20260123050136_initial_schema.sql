@@ -27,7 +27,7 @@ create table users (
   last_active timestamp,
   onboarding_completed boolean default false,
   profile_summary text,
-  onboarding_answers jsonb,
+  onboarding_answers jsonb, -- coreValues, regretPatterns, satisfactionPatterns, decisionStyle, neuroticismScore, materialism, locusOfControl, identityStability
   weekly_fun_budget decimal(10,2) check (weekly_fun_budget >= 0)
 );
 
@@ -76,6 +76,7 @@ create table swipes (
   schedule_id uuid references swipe_schedules(id) on delete cascade,
   timing swipe_timing not null,
   outcome text check (outcome in ('satisfied', 'regret', 'not_sure')) not null,
+  rated_at timestamp default now(),
   created_at timestamp default now(),
   unique(user_id, purchase_id, timing),
   unique(schedule_id)
