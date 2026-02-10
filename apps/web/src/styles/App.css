@@ -1372,6 +1372,10 @@
   grid-auto-rows: auto;
 }
 
+.dashboard-grid .verdict-result > .empty-card {
+  margin-top: 0;
+}
+
 .dashboard-grid .verdict-card>.verdict-actions {
   margin-top: auto;
 }

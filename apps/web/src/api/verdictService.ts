@@ -25,9 +25,19 @@ import {
 } from './verdictScoring'
 import { clamp01 } from './utils'
 
+const SUPPORTED_VERDICTS: VerdictOutcome[] = ['buy', 'hold', 'skip']
+
 const normalizeLikert = (value: number, min: number, max: number) => {
   if (Number.isNaN(value)) return 0
   return clamp01((value - min) / (max - min))
+}
+
+const isVerdictOutcome = (value: unknown): value is VerdictOutcome => {
+  return typeof value === 'string' && SUPPORTED_VERDICTS.includes(value as VerdictOutcome)
+}
+
+const getFallbackAlgorithm = (algorithm: VerdictAlgorithm): VerdictAlgorithm => {
+  return algorithm === 'llm_only' ? 'standard' : algorithm
 }
 
 const computePsychScores = (answers?: OnboardingAnswers | null) => {
@@ -325,7 +335,7 @@ export async function evaluatePurchase(
       similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
       recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
       psychScores,
-      algorithm,
+      algorithm: getFallbackAlgorithm(algorithm),
     })
   }
 
@@ -338,7 +348,8 @@ export async function evaluatePurchase(
       recentRatedPurchases,
       similarLongTermPurchases,
       longTermRatedPurchases,
-      vendorMatch
+      vendorMatch,
+      algorithm
     )
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -396,6 +407,44 @@ export async function evaluatePurchase(
       llmResponse.long_term_regret.explanation
     )
 
+    if (algorithm === 'llm_only') {
+      if (
+        !isVerdictOutcome(llmResponse.verdict) ||
+        typeof llmResponse.confidence !== 'number' ||
+        !Number.isFinite(llmResponse.confidence)
+      ) {
+        return evaluatePurchaseFallback(input, {
+          patternRepetition,
+          financialStrain,
+          vendorMatch,
+          profileContextSummary: profileContext,
+          similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
+          recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
+          psychScores,
+          algorithm: 'standard',
+        })
+      }
+
+      return {
+        outcome: llmResponse.verdict,
+        confidence: clamp01(llmResponse.confidence),
+        reasoning: {
+          valueConflict,
+          patternRepetition,
+          emotionalImpulse,
+          financialStrain,
+          longTermUtility,
+          emotionalSupport,
+          shortTermRegret,
+          longTermRegret,
+          alternativeSolution: llmResponse.alternative_solution,
+          rationale: llmResponse.rationale,
+          importantPurchase: input.isImportant,
+          algorithm,
+        },
+      }
+    }
+
     const decisionResult = computeDecisionByAlgorithm(algorithm, {
       valueConflict: valueConflict.score,
       patternRepetition: patternRepetition.score,
@@ -437,7 +486,7 @@ export async function evaluatePurchase(
       similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
       recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
       psychScores,
-      algorithm,
+      algorithm: getFallbackAlgorithm(algorithm),
     })
   }
 }

@@ -10,52 +10,24 @@ alter table user_values disable row level security;
 alter table swipe_schedules disable row level security;
 alter table swipes disable row level security;
 
--- Fixed test user UUID (create a user in Supabase Auth with this ID, or use for direct DB testing)
+-- Seed test data only for an existing Supabase Auth user.
 do $$
 declare
   test_user_id uuid;
   target_email text := 'gavingengzihao@gmail.com';
 begin
-  -- Match by email: prefer auth.users, then public.users, otherwise create a new id
-  select id into test_user_id from auth.users where email = target_email;
-  if test_user_id is null then
-    select id into test_user_id from public.users where email = target_email;
-  end if;
-  if test_user_id is null then
-    test_user_id := gen_random_uuid();
-    insert into public.users (
-      id,
-      email,
-      onboarding_completed,
-      profile_summary,
-      weekly_fun_budget,
-      onboarding_answers
-    )
-    values (
-      test_user_id,
-      target_email,
-      true,
-      'Focused on financial stability and durability, cautious about impulse buys.',
-      120.00,
-      jsonb_build_object(
-        'coreValues', jsonb_build_array('Financial stability', 'Minimalism / low clutter', 'Emotional wellbeing', 'Self-improvement', 'Convenience'),
-        'regretPatterns', jsonb_build_array('It duplicated something I already had'),
-        'satisfactionPatterns', jsonb_build_array('Lasts a long time', 'Improves my daily routine', 'Makes life calmer or easier', 'Saves time or energy', 'Supports my growth or habits'),
-        'decisionStyle', 'I plan carefully and delay',
-        'neuroticismScore', 2,
-        'materialism', jsonb_build_object(
-          'centrality', 3,
-          'happiness', 2,
-          'success', 2
-        ),
-        'locusOfControl', jsonb_build_object(
-          'workHard', 3,
-          'destiny', 2
-        ),
-        'identityStability', 'Somewhat important'
-      )
+  -- Clean up orphaned profile rows that are not backed by auth.users.
+  delete from public.users u
+  where u.email = target_email
+    and not exists (
+      select 1
+      from auth.users a
+      where a.id = u.id
     );
-  else
+
+  -- Match by email in auth.users only.
+  select id into test_user_id from auth.users where email = target_email;
+  if test_user_id is not null then
     insert into public.users (
       id,
       email,
@@ -93,11 +65,14 @@ begin
       profile_summary = excluded.profile_summary,
       weekly_fun_budget = excluded.weekly_fun_budget,
       onboarding_answers = excluded.onboarding_answers;
+  else
+    raise notice 'Skipping seed for %, no auth.users row exists yet.', target_email;
   end if;
 
-  -- Insert 20 past purchases with variety
-  -- vendor_tier: 0: luxury, 1: premium, 2: mid-tier, 3: generic
-  insert into purchases (user_id, title, price, vendor, vendor_tier, category, purchase_date, source, order_id) values
+  if test_user_id is not null then
+    -- Insert 20 past purchases with variety
+    -- vendor_tier: 0: luxury, 1: premium, 2: mid-tier, 3: generic
+    insert into purchases (user_id, title, price, vendor, vendor_tier, category, purchase_date, source, order_id) values
     -- Electronics (mixed satisfaction patterns)
     (test_user_id, 'Wireless Noise-Cancelling Headphones', 299.99, 'Amazon', 2, 'electronics', current_date - interval '45 days', 'manual', 'ORD-001'),
     (test_user_id, 'USB-C Hub 7-in-1', 49.99, 'Amazon', 2, 'electronics', current_date - interval '42 days', 'manual', 'ORD-002'),
@@ -131,35 +106,36 @@ begin
 
     -- Miscellaneous
     (test_user_id, 'Online Course: Web Development', 199.00, 'Udemy', 2, 'education', current_date - interval '1 day', 'manual', 'ORD-020')
-  on conflict do nothing;
+    on conflict do nothing;
 
-  -- Generate swipe schedules for all seeded purchases to populate the feedback loop
-  insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
-  select 
-    user_id, 
-    id, 
-    t.timing,
-    case 
-      when t.timing = 'immediate' then purchase_date
-      when t.timing = 'week3' then purchase_date + interval '3 weeks'
-      when t.timing = 'month3' then purchase_date + interval '3 months'
-    end as scheduled_for
-  from purchases
-  cross join (
-    select unnest(array['immediate','week3','month3']::swipe_timing[]) as timing
-  ) t
-  where user_id = test_user_id
-  on conflict do nothing;
+    -- Generate swipe schedules for all seeded purchases to populate the feedback loop
+    insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
+    select 
+      user_id, 
+      id, 
+      t.timing,
+      case 
+        when t.timing = 'immediate' then purchase_date
+        when t.timing = 'week3' then purchase_date + interval '3 weeks'
+        when t.timing = 'month3' then purchase_date + interval '3 months'
+      end as scheduled_for
+    from purchases
+    cross join (
+      select unnest(array['immediate','week3','month3']::swipe_timing[]) as timing
+    ) t
+    where user_id = test_user_id
+    on conflict do nothing;
 
-  -- Add some user values for the test user
-  insert into user_values (user_id, value_type, preference_score)
-  values
-    (test_user_id, 'interpersonal_value', 3),
-    (test_user_id, 'durability', 5),
-    (test_user_id, 'efficiency', 5),
-    (test_user_id, 'emotional_value', 3),
-    (test_user_id, 'aesthetics', 4)
-  on conflict (user_id, value_type) do update set preference_score = excluded.preference_score;
+    -- Add some user values for the test user
+    insert into user_values (user_id, value_type, preference_score)
+    values
+      (test_user_id, 'interpersonal_value', 3),
+      (test_user_id, 'durability', 5),
+      (test_user_id, 'efficiency', 5),
+      (test_user_id, 'emotional_value', 3),
+      (test_user_id, 'aesthetics', 4)
+    on conflict (user_id, value_type) do update set preference_score = excluded.preference_score;
+  end if;
 end $$;
 
 -- Re-enable RLS

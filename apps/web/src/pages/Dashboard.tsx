@@ -259,6 +259,16 @@ export default function Dashboard({ session }: DashboardProps) {
                   />
                   <span>Cost-sensitive isotonic</span>
                 </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="verdict-algorithm"
+                    value="llm_only"
+                    checked={verdictAlgorithm === 'llm_only'}
+                    onChange={() => setVerdictAlgorithm('llm_only')}
+                  />
+                  <span>LLM only</span>
+                </label>
               </div>
             </div>
             <LiquidButton className="primary" type="submit" disabled={submitting}>

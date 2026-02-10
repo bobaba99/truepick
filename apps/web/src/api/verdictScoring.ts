@@ -427,9 +427,11 @@ export const evaluatePurchaseFallback = (
   const financialStrain =
     overrides?.financialStrain ??
     buildScore(0, 'No budget context in fallback.')
+  const effectiveAlgorithm =
+    overrides?.algorithm === 'llm_only' ? 'standard' : (overrides?.algorithm ?? 'standard')
 
   const decisionResult = computeDecisionByAlgorithm(
-    overrides?.algorithm ?? 'standard',
+    effectiveAlgorithm,
     {
       valueConflict: valueConflict.score,
       patternRepetition: patternRepetition.score,

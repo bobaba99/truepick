@@ -18,6 +18,8 @@ create type verdict_outcome as enum ('bought', 'hold', 'skip');
 create type vendorQuality as enum ('low', 'medium', 'high');
 create type vendorReliability as enum ('low', 'medium', 'high');
 create type vendorPriceTier as enum ('budget', 'mid_range', 'premium', 'luxury');
+create type purchaseStatsDimensionType as enum ('category', 'price_range', 'vendor', 'vendor_quality', 'vendor_reliability', 'vendor_price_tier');
+create type email_connection_provider as enum ('gmail', 'outlook', 'other');
 
 -- Users and onboarding
 create table users (
@@ -89,7 +91,7 @@ create table swipes (
 create table purchase_stats (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id) on delete cascade,
-  dimension_type text not null, -- 'category', 'vendor', 'price_range', 'vendor_tier'
+  dimension_type purchaseStatsDimensionType not null, -- 'category', 'vendor', 'price_range', 'vendor_tier'
   dimension_value text not null,
   total_purchases int default 0,
   total_swipes int default 0,
@@ -108,7 +110,7 @@ create table verdicts (
   candidate_category purchaseCategory,
   candidate_vendor text,
   candidate_vendor_id int, -- optional FK to vendors when matched
-  scoring_model text check (scoring_model in ('standard', 'cost_sensitive_iso')) default 'standard',
+  scoring_model text check (scoring_model in ('standard', 'cost_sensitive_iso', 'llm_only')) default 'standard',
   justification text, -- user's stated reason for considering purchase
   predicted_outcome text check (predicted_outcome in ('buy', 'hold', 'skip')),
   confidence_score decimal(5,4), -- 0.0 to 1.0

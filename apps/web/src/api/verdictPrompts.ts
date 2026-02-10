@@ -1,4 +1,4 @@
-import type { PurchaseInput, VendorMatch } from './types'
+import type { PurchaseInput, VerdictAlgorithm, VendorMatch } from './types'
 import { VENDOR_RUBRIC } from './verdictScoring'
 
 export const buildSystemPrompt = () => {
@@ -50,8 +50,21 @@ export const buildUserPrompt = (
   recentPurchases: string,
   similarLongTermPurchases: string,
   longTermPurchases: string,
-  vendorMatch: VendorMatch | null
+  vendorMatch: VendorMatch | null,
+  algorithm: VerdictAlgorithm
 ) => {
+  const llmOnlyFields =
+    algorithm === 'llm_only'
+      ? `  "verdict": "<one of: buy, hold, skip>",
+  "confidence": <number 0-1, how confident you are in this recommendation>,
+`
+      : ''
+
+  const llmOnlyInstruction =
+    algorithm === 'llm_only'
+      ? '\nFor this request, use your own judgment to set the final verdict and confidence directly.'
+      : ''
+
   return `${profileContext}
 
 Immediate regret signals (ratings within last 30 days):
@@ -71,6 +84,7 @@ Now evaluate this purchase:
 - Vendor: ${input.vendor ?? 'Not specified'}
 - User rationale: "${input.justification ?? 'No rationale provided'}"
 - Important purchase: ${input.isImportant ? 'Yes' : 'No'}
+${llmOnlyInstruction}
 
 Output the final verdict and scoring in this exact JSON format:
 {
@@ -98,6 +112,7 @@ Output the final verdict and scoring in this exact JSON format:
     "score": <number 0-1>,
     "explanation": "<brief explanation of long-term regret risk, be friendly and neutral>"
   },
+${llmOnlyFields}
   "alternative_solution": "<2-3 sentences offering an alternative way to meet the same need if the verdict is hold/skip>",
   "rationale": "<Write a personalized 3-4 sentence narrative explaining the recommendation. CRITICAL: Do not just list facts. Connect the evidence (price, vendor, history) directly to the decision. Example: 'We recommend holding because [Reason], which conflicts with your value of [Value].' Structure: (1) Outcome + Primary Reason. (2) Connection to User Profile/Values (quote values in <em> tags). (3) Supporting evidence from history/vendor. Use a warm, conversational tone.>"
 }`
