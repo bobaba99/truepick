@@ -54,8 +54,12 @@ export default function Dashboard({ session }: DashboardProps) {
   }, [session])
 
   useEffect(() => {
-    void loadStats()
-    void loadRecentVerdicts()
+    const timeoutId = window.setTimeout(() => {
+      void loadStats()
+      void loadRecentVerdicts()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [loadStats, loadRecentVerdicts])
 
   const resetForm = () => {

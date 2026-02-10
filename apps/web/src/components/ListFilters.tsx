@@ -1,26 +1,5 @@
 import { PURCHASE_CATEGORIES } from '../api/types'
-
-export type FilterState = {
-    category: string
-    vendor: string
-    priceMin: string
-    priceMax: string
-    date: string
-    recommendation: string // for verdicts
-    decision: string // for verdicts
-    source: string // for purchases
-}
-
-export const INITIAL_FILTERS: FilterState = {
-    category: '',
-    vendor: '',
-    priceMin: '',
-    priceMax: '',
-    date: '',
-    recommendation: '',
-    decision: '',
-    source: '',
-}
+import type { FilterState } from './ListFilters.model'
 
 type ListFiltersProps = {
     search: string

@@ -78,7 +78,7 @@ export default function Swipe({ session }: SwipeProps) {
       const data = await getUnratedPurchases(session.user.id, { includeFuture: true })
       setPurchases(data)
       setCurrentIndex(0)
-    } catch (err) {
+    } catch {
       setStatus('Failed to load purchases.')
     } finally {
       setLoading(false)
@@ -246,9 +246,9 @@ export default function Swipe({ session }: SwipeProps) {
         undoTimerRef.current = window.setTimeout(() => {
           setLastSwipe(null)
         }, UNDO_TIMEOUT_MS)
-      }, 300)
+      }, animationDelay)
     },
-    [session, currentPurchase, swiping, undoing, clearLastSwipe],
+    [session, currentPurchase, currentItem, swiping, undoing, clearLastSwipe],
   )
 
   const handleRegret = useCallback(() => {

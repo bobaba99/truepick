@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Swipe from './pages/Swipe'
 import Profile from './pages/Profile'
 import './styles/App.css'
-import { CustomCursor, useGSAPLoader, SplitText, LiquidButton, VolumetricInput } from './components/Kinematics'
+import { CustomCursor, useGSAPLoader, LiquidButton, VolumetricInput } from './components/Kinematics'
 
 type AuthMode = 'sign_in' | 'sign_up'
 
@@ -47,15 +47,11 @@ function RequireAuth({ session }: { session: Session | null }) {
   return <Outlet />
 }
 
-function PublicOnly({ children }: { session: Session | null; children: JSX.Element }) {
+function PublicOnly({ children }: { session: Session | null; children: React.ReactNode }) {
   return children
 }
 
-function AppShell({ session, onSignOut, loading }: {
-  session: Session
-  onSignOut: () => void
-  loading: boolean
-}) {
+function AppShell() {
   return (
     <div className="app-shell">
       <div className="route-surface">
@@ -151,7 +147,7 @@ function AuthRoute({
                 as="input"
                 autoComplete="email"
                 value={email}
-                onChange={(event) => onEmailChange(event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => onEmailChange(event.target.value)}
                 placeholder="you@domain.com"
                 required
               />
@@ -165,7 +161,7 @@ function AuthRoute({
                   authMode === 'sign_in' ? 'current-password' : 'new-password'
                 }
                 value={password}
-                onChange={(event) => onPasswordChange(event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => onPasswordChange(event.target.value)}
                 placeholder="••••••••"
                 minLength={6}
                 required
@@ -359,7 +355,7 @@ function App() {
               <Route
                 element={
                   session ? (
-                    <AppShell session={session} onSignOut={handleSignOut} loading={loading} />
+                    <AppShell />
                   ) : null
                 }
               >

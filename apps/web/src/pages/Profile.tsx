@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Session } from '@supabase/supabase-js'
@@ -7,7 +7,6 @@ import type {
   PurchaseRow,
   UserDecision,
   UserRow,
-  UserValueRow,
   VerdictRow,
 } from '../api/types'
 import { PURCHASE_CATEGORIES } from '../api/types'
@@ -16,12 +15,6 @@ import {
   createUserProfile,
   updateUserProfile,
 } from '../api/userProfileService'
-import {
-  getUserValues,
-  createUserValue,
-  updateUserValue,
-  deleteUserValue,
-} from '../api/userValueService'
 import { getVerdictHistory, updateVerdictDecision, deleteVerdict } from '../api/verdictService'
 import {
   getPurchaseHistory,
@@ -31,39 +24,12 @@ import {
 } from '../api/purchaseService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
-import ListFilters, { type FilterState, INITIAL_FILTERS } from '../components/ListFilters'
+import ListFilters from '../components/ListFilters'
+import { type FilterState, INITIAL_FILTERS } from '../components/ListFilters.model'
 
 type ProfileProps = {
   session: Session | null
 }
-
-const valueOptions = [
-  {
-    value: 'durability',
-    label: 'Durability',
-    description: 'I value things that last several years.',
-  },
-  {
-    value: 'efficiency',
-    label: 'Efficiency',
-    description: 'I value tools that saves time for me.',
-  },
-  {
-    value: 'aesthetics',
-    label: 'Aesthetics',
-    description: "I value items that fit my existing environment's visual language.",
-  },
-  {
-    value: 'interpersonal_value',
-    label: 'Interpersonal Value',
-    description: 'I value purchases that facilitate shared experiences.',
-  },
-  {
-    value: 'emotional_value',
-    label: 'Emotional Value',
-    description: 'I value purchases that provide meaningful emotional benefits.',
-  },
-] as const
 
 const coreValueOptions = [
   'Financial stability',
@@ -174,12 +140,10 @@ const normalizeOnboardingAnswers = (
 }
 
 export default function Profile({ session }: ProfileProps) {
-  const [userRow, setUserRow] = useState<UserRow | null>(null)
-  const [userValues, setUserValues] = useState<UserValueRow[]>([])
+  const [, setUserRow] = useState<UserRow | null>(null)
   const [verdicts, setVerdicts] = useState<VerdictRow[]>([])
   const [purchases, setPurchases] = useState<PurchaseRow[]>([])
   const [status, setStatus] = useState<string>('')
-  const [savingValueType, setSavingValueType] = useState<string | null>(null)
   const [purchaseTitle, setPurchaseTitle] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseVendor, setPurchaseVendor] = useState('')
@@ -191,7 +155,6 @@ export default function Profile({ session }: ProfileProps) {
   const [purchaseModalMode, setPurchaseModalMode] = useState<'add' | 'edit'>('add')
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
-  const [editingValues, setEditingValues] = useState(false)
   const [profileSummary, setProfileSummary] = useState('')
   const [weeklyFunBudget, setWeeklyFunBudget] = useState('')
   const [profileDraftSummary, setProfileDraftSummary] = useState('')
@@ -247,7 +210,7 @@ export default function Profile({ session }: ProfileProps) {
     return matchesFilters(p, purchaseFilters)
   })
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!session) return
 
     try {
@@ -284,7 +247,28 @@ export default function Profile({ session }: ProfileProps) {
           return
         }
 
-        await loadProfile()
+        const refreshedProfile = await getUserProfile(session.user.id)
+        if (!refreshedProfile) {
+          setStatus('Profile created but could not be fetched yet. Please refresh.')
+          return
+        }
+
+        setUserRow(refreshedProfile)
+        const summaryValue = refreshedProfile.profile_summary ?? ''
+        const budgetValue =
+          refreshedProfile.weekly_fun_budget !== null &&
+          refreshedProfile.weekly_fun_budget !== undefined
+            ? String(refreshedProfile.weekly_fun_budget)
+            : ''
+
+        setProfileSummary(summaryValue)
+        setWeeklyFunBudget(budgetValue)
+        setProfileDraftSummary(summaryValue)
+        setProfileDraftBudget(budgetValue)
+        setOnboardingAnswers(
+          normalizeOnboardingAnswers(refreshedProfile.onboarding_answers ?? null),
+        )
+        setStatus('')
         return
       }
 
@@ -307,51 +291,43 @@ export default function Profile({ session }: ProfileProps) {
       console.error('Profile load error', err)
       setStatus(`Profile load error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
-  }
+  }, [session])
 
-  const loadUserValues = async () => {
-    if (!session) return
-
-    try {
-      const data = await getUserValues(session.user.id)
-      setUserValues(data)
-    } catch (err) {
-      setStatus('Unable to load values from Supabase. Check RLS policies.')
-    }
-  }
-
-  const loadVerdicts = async () => {
+  const loadVerdicts = useCallback(async () => {
     if (!session) return
 
     try {
       const data = await getVerdictHistory(session.user.id, 10)
       setVerdicts(data)
-    } catch (err) {
+    } catch {
       setStatus('Unable to load verdicts from Supabase. Check RLS policies.')
     }
-  }
+  }, [session])
 
-  const loadPurchases = async () => {
+  const loadPurchases = useCallback(async () => {
     if (!session) return
 
     try {
       const data = await getPurchaseHistory(session.user.id, 10)
       setPurchases(data)
-    } catch (err) {
+    } catch {
       setStatus('Unable to load purchases from Supabase. Check RLS policies.')
     }
-  }
+  }, [session])
 
   useEffect(() => {
     if (!session) {
       return
     }
 
-    void loadProfile()
-    void loadUserValues()
-    void loadVerdicts()
-    void loadPurchases()
-  }, [session])
+    const timeoutId = window.setTimeout(() => {
+      void loadProfile()
+      void loadVerdicts()
+      void loadPurchases()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [session, loadProfile, loadVerdicts, loadPurchases])
 
   const resetPurchaseForm = () => {
     setPurchaseTitle('')
@@ -362,50 +338,6 @@ export default function Profile({ session }: ProfileProps) {
     setPurchaseEditingId(null)
     setPurchaseModalOpen(false)
     setPurchaseModalMode('add')
-  }
-
-  const getValueForType = (valueType: string): UserValueRow | undefined => {
-    return userValues.find((v) => v.value_type === valueType)
-  }
-
-  const handleValueChange = async (valueType: string, score: number | null) => {
-    if (!session) return
-
-    setSavingValueType(valueType)
-    setStatus('')
-
-    const existingValue = getValueForType(valueType)
-
-    if (score === null) {
-      // Delete the value
-      if (existingValue) {
-        const { error } = await deleteUserValue(session.user.id, existingValue.id)
-        if (error) {
-          setStatus(error)
-          setSavingValueType(null)
-          return
-        }
-      }
-    } else if (existingValue) {
-      // Update existing value
-      const { error } = await updateUserValue(session.user.id, existingValue.id, score)
-      if (error) {
-        setStatus(error)
-        setSavingValueType(null)
-        return
-      }
-    } else {
-      // Create new value
-      const { error } = await createUserValue(valueType, score)
-      if (error) {
-        setStatus(error)
-        setSavingValueType(null)
-        return
-      }
-    }
-
-    await loadUserValues()
-    setSavingValueType(null)
   }
 
   const toggleSelection = (items: string[], value: string) => {

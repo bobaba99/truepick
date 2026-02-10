@@ -1,44 +1,85 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ElementType,
+  type ReactNode,
+} from 'react'
+
+type GsapSetter = (value: number) => void
+type GsapVars = Record<string, unknown>
+type GsapContext = { revert: () => void }
+
+type GsapApi = {
+  quickTo: (target: object | null, property: string, vars: GsapVars) => GsapSetter
+  set: (target: object | null, vars: GsapVars) => void
+  to: (target: object | null, vars: GsapVars) => void
+  fromTo: (target: object | null, fromVars: GsapVars, toVars: GsapVars) => void
+  context: (callback: () => void, scope?: object | null) => GsapContext
+  registerPlugin: (plugin: unknown) => void
+}
 
 declare global {
   interface Window {
-    gsap: any
-    ScrollTrigger: any
+    gsap?: GsapApi
+    ScrollTrigger?: unknown
   }
 }
 
+type PolymorphicProps<C extends ElementType, Props extends object = object> = Props & {
+  as?: C
+} & Omit<ComponentPropsWithoutRef<C>, keyof Props | 'as'>
+
+type BasicButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'children'> & {
+  children: ReactNode
+  className?: string
+}
+
+type BasicDivProps = Omit<ComponentPropsWithoutRef<'div'>, 'children'> & {
+  children: ReactNode
+  className?: string
+}
+
+const isDisableableElement = (
+  element: HTMLElement,
+): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+  'disabled' in element
+
 export const useGSAPLoader = () => {
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded] = useState(
+    () => Boolean(window.gsap && window.ScrollTrigger),
+  )
 
   useEffect(() => {
     if (window.gsap && window.ScrollTrigger) {
-      setLoaded(true)
       return
     }
 
-    const loadScript = (src: string) => {
-      return new Promise((resolve, reject) => {
+    const loadScript = (src: string) =>
+      new Promise<void>((resolve, reject) => {
         const script = document.createElement('script')
         script.src = src
         script.async = true
-        script.onload = resolve
-        script.onerror = reject
+        script.onload = () => resolve()
+        script.onerror = () => reject(new Error(`Failed to load ${src}`))
         document.body.appendChild(script)
       })
-    }
 
-    Promise.all([
+    void Promise.all([
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js'),
       loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js'),
-    ]).then(() => {
-      // Small delay to ensure registration
-      setTimeout(() => {
-        if (window.gsap && window.ScrollTrigger) {
-          window.gsap.registerPlugin(window.ScrollTrigger)
-          setLoaded(true)
-        }
-      }, 50)
-    }).catch(err => console.error('GSAP load failed', err))
+    ])
+      .then(() => {
+        setTimeout(() => {
+          if (window.gsap && window.ScrollTrigger) {
+            window.gsap.registerPlugin(window.ScrollTrigger)
+            setLoaded(true)
+          }
+        }, 50)
+      })
+      .catch((error) => console.error('GSAP load failed', error))
   }, [])
 
   return loaded
@@ -51,15 +92,14 @@ export const useMagnetic = (strength = 0.35) => {
     if (!window.gsap || !ref.current) return
 
     const el = ref.current
-    const xTo = window.gsap.quickTo(el, "x", { duration: 1, ease: "power3.out" })
-    const yTo = window.gsap.quickTo(el, "y", { duration: 1, ease: "power3.out" })
+    const xTo = window.gsap.quickTo(el, 'x', { duration: 1, ease: 'power3.out' })
+    const yTo = window.gsap.quickTo(el, 'y', { duration: 1, ease: 'power3.out' })
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const { clientX, clientY } = e
+    const handleMouseMove = (event: MouseEvent) => {
+      const { clientX, clientY } = event
       const { left, top, width, height } = el.getBoundingClientRect()
       const x = clientX - (left + width / 2)
       const y = clientY - (top + height / 2)
-      
       xTo(x * strength)
       yTo(y * strength)
     }
@@ -76,7 +116,7 @@ export const useMagnetic = (strength = 0.35) => {
       el.removeEventListener('mousemove', handleMouseMove)
       el.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [])
+  }, [strength])
 
   return ref
 }
@@ -88,10 +128,10 @@ export const useGlassShimmer = () => {
     const el = ref.current
     if (!el) return
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (event: MouseEvent) => {
       const rect = el.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
       el.style.setProperty('--mouse-x', `${x}px`)
       el.style.setProperty('--mouse-y', `${y}px`)
     }
@@ -112,30 +152,29 @@ export const CustomCursor = () => {
 
     const dot = dotRef.current
     const ring = ringRef.current
-
     window.gsap.set(dot, { xPercent: -50, yPercent: -50 })
     window.gsap.set(ring, { xPercent: -50, yPercent: -50 })
 
-    const xTo = window.gsap.quickTo(ring, "x", { duration: 0.6, ease: "power3" })
-    const yTo = window.gsap.quickTo(ring, "y", { duration: 0.6, ease: "power3" })
+    const xTo = window.gsap.quickTo(ring, 'x', { duration: 0.6, ease: 'power3' })
+    const yTo = window.gsap.quickTo(ring, 'y', { duration: 0.6, ease: 'power3' })
 
-    const onMouseMove = (e: MouseEvent) => {
-      window.gsap.set(dot, { x: e.clientX, y: e.clientY })
-      xTo(e.clientX)
-      yTo(e.clientY)
+    const onMouseMove = (event: MouseEvent) => {
+      window.gsap?.set(dot, { x: event.clientX, y: event.clientY })
+      xTo(event.clientX)
+      yTo(event.clientY)
     }
 
-    const onHoverStart = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
+    const onHoverStart = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
       if (target.closest('[data-cursor="expand"]')) {
-        window.gsap.to(ring, { scale: 2, duration: 0.3 })
+        window.gsap?.to(ring, { scale: 2, duration: 0.3 })
       }
     }
 
-    const onHoverEnd = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
+    const onHoverEnd = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
       if (target.closest('[data-cursor="expand"]')) {
-        window.gsap.to(ring, { scale: 1, duration: 0.3 })
+        window.gsap?.to(ring, { scale: 1, duration: 0.3 })
       }
     }
 
@@ -158,7 +197,13 @@ export const CustomCursor = () => {
   )
 }
 
-export const SplitText = ({ children, className }: { children: string, className?: string }) => {
+export const SplitText = ({
+  children,
+  className,
+}: {
+  children: string
+  className?: string
+}) => {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -166,7 +211,8 @@ export const SplitText = ({ children, className }: { children: string, className
 
     const ctx = window.gsap.context(() => {
       const words = ref.current?.querySelectorAll('.word')
-      window.gsap.fromTo(words, 
+      window.gsap?.fromTo(
+        words as unknown as object | null,
         { y: '110%', rotateX: -40, opacity: 0 },
         {
           y: '0%',
@@ -178,8 +224,8 @@ export const SplitText = ({ children, className }: { children: string, className
           scrollTrigger: {
             trigger: ref.current,
             start: 'top 90%',
-          }
-        }
+          },
+        },
       )
     }, ref)
 
@@ -189,9 +235,22 @@ export const SplitText = ({ children, className }: { children: string, className
   const words = children.split(' ')
 
   return (
-    <div ref={ref} className={`split-text-wrapper ${className || ''}`} style={{ overflow: 'hidden', perspective: '1000px' }}>
-      {words.map((word, i) => (
-        <span key={i} className="word-wrapper" style={{ display: 'inline-block', overflow: 'hidden', verticalAlign: 'top', marginRight: '0.25em' }}>
+    <div
+      ref={ref}
+      className={`split-text-wrapper ${className ?? ''}`}
+      style={{ overflow: 'hidden', perspective: '1000px' }}
+    >
+      {words.map((word, index) => (
+        <span
+          key={`${word}-${index}`}
+          className="word-wrapper"
+          style={{
+            display: 'inline-block',
+            overflow: 'hidden',
+            verticalAlign: 'top',
+            marginRight: '0.25em',
+          }}
+        >
           <span className="word" style={{ display: 'inline-block', transformOrigin: '0% 100%' }}>
             {word}
           </span>
@@ -201,32 +260,40 @@ export const SplitText = ({ children, className }: { children: string, className
   )
 }
 
-export const MagneticButton = ({ children, className, onClick, disabled, type = 'button' }: any) => {
+export const MagneticButton = ({ children, className, ...buttonProps }: BasicButtonProps) => {
   const ref = useMagnetic()
   return (
-    <button ref={ref} className={className} onClick={onClick} disabled={disabled} type={type} data-cursor="expand">
+    <button ref={ref} className={className} data-cursor="expand" {...buttonProps}>
       {children}
     </button>
   )
 }
 
-export const GlassCard = ({ children, className, onClick, onKeyDown, role, tabIndex }: any) => {
+export const GlassCard = ({ children, className, ...divProps }: BasicDivProps) => {
   const ref = useGlassShimmer()
   return (
-    <div 
-      ref={ref} 
-      className={`glass-shimmer ${className}`}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      role={role}
-      tabIndex={tabIndex}
-    >
+    <div ref={ref} className={`glass-shimmer ${className ?? ''}`} {...divProps}>
       {children}
     </div>
   )
 }
 
-export const LiquidButton = ({ as: Component = 'button', children, className, onClick, disabled, type = 'button', ...props }: any) => {
+type LiquidButtonProps<C extends ElementType = 'button'> = PolymorphicProps<
+  C,
+  {
+    children: ReactNode
+    className?: string
+  }
+>
+
+export const LiquidButton = <C extends ElementType = 'button'>({
+  as,
+  children,
+  className,
+  ...props
+}: LiquidButtonProps<C>) => {
+  const Component = (as ?? 'button') as ElementType
+  const isNativeButton = as === undefined || as === 'button'
   const ref = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -234,31 +301,37 @@ export const LiquidButton = ({ as: Component = 'button', children, className, on
     const el = ref.current
 
     const onMouseDown = () => {
-      window.gsap.to(el, { scale: 0.98, duration: 0.1, ease: 'power1.out' })
+      window.gsap?.to(el, { scale: 0.98, duration: 0.1, ease: 'power1.out' })
     }
 
     const onMouseUp = () => {
-      window.gsap.to(el, { scale: 1.05, duration: 0.15, ease: 'power2.out', onComplete: () => {
-        window.gsap.to(el, { scale: 1, duration: 0.4, ease: 'elastic.out(1, 0.3)', onComplete: () => {
-          window.gsap.set(el, { clearProps: 'transform' })
-        }})
-      }})
+      window.gsap?.to(el, {
+        scale: 1.05,
+        duration: 0.15,
+        ease: 'power2.out',
+        onComplete: () => {
+          window.gsap?.to(el, {
+            scale: 1,
+            duration: 0.4,
+            ease: 'elastic.out(1, 0.3)',
+            onComplete: () => window.gsap?.set(el, { clearProps: 'transform' }),
+          })
+        },
+      })
     }
 
-    const onMouseMove = (e: MouseEvent) => {
+    const onMouseMove = (event: MouseEvent) => {
       const rect = el.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      el.style.setProperty('--x', `${x}px`)
-      el.style.setProperty('--y', `${y}px`)
+      el.style.setProperty('--x', `${event.clientX - rect.left}px`)
+      el.style.setProperty('--y', `${event.clientY - rect.top}px`)
     }
 
-    const onClickRipple = (e: MouseEvent) => {
-      if ((el as any).disabled) return
+    const onClickRipple = (event: MouseEvent) => {
+      if (isDisableableElement(el) && el.disabled) return
 
       const rect = el.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
 
       const ripple = document.createElement('div')
       ripple.style.position = 'absolute'
@@ -273,10 +346,9 @@ export const LiquidButton = ({ as: Component = 'button', children, className, on
       ripple.style.zIndex = '1'
 
       el.appendChild(ripple)
-
       const size = Math.max(rect.width, rect.height) * 2.5
 
-      window.gsap.to(ripple, {
+      window.gsap?.to(ripple, {
         width: size,
         height: size,
         opacity: 0,
@@ -284,7 +356,7 @@ export const LiquidButton = ({ as: Component = 'button', children, className, on
         ease: 'power2.out',
         onComplete: () => {
           if (el.contains(ripple)) el.removeChild(ripple)
-        }
+        },
       })
     }
 
@@ -305,43 +377,64 @@ export const LiquidButton = ({ as: Component = 'button', children, className, on
   }, [])
 
   return (
-    <Component ref={ref} className={`liquid-button ${className || ''}`} onClick={onClick} disabled={disabled} type={type} {...props}>
+    <Component
+      ref={ref as unknown as never}
+      className={`liquid-button ${className ?? ''}`}
+      {...(isNativeButton ? { type: 'button' } : {})}
+      {...props}
+    >
       <span className="liquid-content">{children}</span>
     </Component>
   )
 }
 
-export const VolumetricInput = ({ as: Component = 'input', className, ...props }: any) => {
+type VolumetricInputProps<C extends ElementType = 'input'> = PolymorphicProps<
+  C,
+  {
+    children?: ReactNode
+    className?: string
+  }
+>
+
+export const VolumetricInput = <C extends ElementType = 'input'>({
+  as,
+  className,
+  children,
+  ...props
+}: VolumetricInputProps<C>) => {
+  const Component = (as ?? 'input') as ElementType
   const ref = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (!window.gsap || !ref.current) return
     const el = ref.current
 
-    // Proximity Glow
-    const updateGlow = (e: MouseEvent) => {
+    const updateGlow = (event: MouseEvent) => {
       const rect = el.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
       const centerY = rect.top + rect.height / 2
-      const dist = Math.hypot(e.clientX - centerX, e.clientY - centerY)
-      
-      // 150px buffer for proximity
-      if (dist < 150) {
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-        el.style.setProperty('--glow-x', `${x}px`)
-        el.style.setProperty('--glow-y', `${y}px`)
-        el.style.setProperty('--glow-opacity', `${1 - Math.min(dist / 150, 1)}`)
+      const distance = Math.hypot(event.clientX - centerX, event.clientY - centerY)
+
+      if (distance < 150) {
+        el.style.setProperty('--glow-x', `${event.clientX - rect.left}px`)
+        el.style.setProperty('--glow-y', `${event.clientY - rect.top}px`)
+        el.style.setProperty('--glow-opacity', `${1 - Math.min(distance / 150, 1)}`)
       } else {
         el.style.setProperty('--glow-opacity', '0')
       }
     }
 
     window.addEventListener('mousemove', updateGlow)
-    return () => {
-      window.removeEventListener('mousemove', updateGlow)
-    }
+    return () => window.removeEventListener('mousemove', updateGlow)
   }, [])
 
-  return <Component ref={ref} className={`volumetric-input ${className || ''}`} {...props} />
+  return (
+    <Component
+      ref={ref as unknown as never}
+      className={`volumetric-input ${className ?? ''}`}
+      {...props}
+    >
+      {children}
+    </Component>
+  )
 }

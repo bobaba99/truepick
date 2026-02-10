@@ -144,8 +144,6 @@ const buildVendorUtilityScore = (vendorMatch?: VendorMatch | null) => {
   return buildScore(utilityScore, explanation)
 }
 
-const LINE_BREAK = '\n'
-
 const parseProfileData = (summary?: string) => {
   if (!summary || summary.includes('Profile summary: not set.')) return null
   
