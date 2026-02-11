@@ -81,7 +81,17 @@ The details include the product name, price, category, vendor, justification, an
 - The user enters minimal justification for the purchase. If the length is less than 10 words, the app will show a modal dialog suggesting the user to write down more details with some probing questions to get a more accurate verdict. The dialog has a button to 'go back' and another button to 'continue' if the user wants to continue with missing details.
 - The justification also cannot be too long. If the length is greater than 100 words, the app will show a modal dialog suggesting the user to shorten the justification. The dialog has a button to 'go back' and another button to 'continue' if the user wants to continue with the long justification. This way to keep the token count in check.
 
-### 4.2 Flow: Swiping for Regret/Satisfaction
+### 4.2 Flow: Regenerate Verdict
+
+The user can regenerate the verdict for the purchase. The app will regenerate the verdict for the purchase. The user can also regenerate the verdict for the purchase from the profile page.
+
+```
+[Dashboard/Profile] → [Regenerate Verdict] → [Verdict Result]
+```
+
+#### 4.2.1 Edge Cases
+
+### 4.3 Flow: Swiping for Regret/Satisfaction
 
 The user can swipe for regret or satisfaction on the purchase. The app will update the purchase stats. Seeding purchases will be available for swiping immediately after importing from the email API. New verdicts will be available for swiping after 3 days, then 3 weeks, and finally 3 months. The stats will be aggregated for product category, vendor, and price range, and displayed in a chart in the dashboard. It will be stored in Supabase as a table called `purchase_stats` with the following columns: `id`, `user_id`, `vendor_id`, `dimension_type` (enum: category | price_range | vendor | vendor_quality | vendor_reliability | vendor_price_tier ), `total_purchases`, `total_swipes`, `regret_count`, `satisfied_count`, `regret_rate`, `last_updated`. The dashbaord only displays the most impactful stats and the profile displays all the stats with filter enabled for each dimension type.
 

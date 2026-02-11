@@ -19,16 +19,9 @@ type PurchaseWithSwipe = {
 const VENDOR_SELECT_FIELDS =
   'vendor_id, vendor_name, vendor_category, vendor_quality, vendor_reliability, vendor_price_tier'
 
-const CATEGORY_VENDOR_MAP: Record<string, string> = {
-  home_goods: 'home goods',
-  health_wellness: 'health & wellness',
-  food_beverage: 'food & beverage',
-}
-
 const normalizeVendorCategory = (category: string | null | undefined) => {
   if (!category) return null
-  const normalized = category.trim().toLowerCase()
-  return CATEGORY_VENDOR_MAP[normalized] ?? normalized
+  return category.trim().toLowerCase()
 }
 
 const fetchVendorMatch = async (

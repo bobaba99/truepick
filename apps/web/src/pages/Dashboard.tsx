@@ -2,16 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import type { Stats, VerdictAlgorithm, VerdictRow } from '../api/types'
+import type { Stats, VerdictRow } from '../api/types'
 import { PURCHASE_CATEGORIES } from '../api/types'
 import { getSwipeStats } from '../api/statsService'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
 import {
   getVerdictHistory,
-  createVerdict,
   evaluatePurchase,
+  submitVerdict,
+  inputFromVerdict,
   updateVerdictDecision,
-  regenerateVerdict,
 } from '../api/verdictService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
@@ -38,8 +38,6 @@ export default function Dashboard({ session }: DashboardProps) {
   const [vendor, setVendor] = useState('')
   const [justification, setJustification] = useState('')
   const [importantPurchase, setImportantPurchase] = useState(false)
-  const [verdictAlgorithm, setVerdictAlgorithm] =
-    useState<VerdictAlgorithm>('standard')
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
   const generationLockMessage =
@@ -107,10 +105,9 @@ export default function Dashboard({ session }: DashboardProps) {
     const evaluation = await evaluatePurchase(
       session.user.id,
       input,
-      openaiApiKey,
-      verdictAlgorithm
+      openaiApiKey
     )
-    const { error } = await createVerdict(session.user.id, input, evaluation)
+    const { error } = await submitVerdict(session.user.id, input, evaluation)
 
     if (error) {
       setStatus(error)
@@ -158,7 +155,14 @@ export default function Dashboard({ session }: DashboardProps) {
 
     try {
       const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
-      const { data, error } = await regenerateVerdict(session.user.id, verdict, openaiApiKey)
+      const input = inputFromVerdict(verdict)
+      const evaluation = await evaluatePurchase(session.user.id, input, openaiApiKey)
+      const { data, error } = await submitVerdict(
+        session.user.id,
+        input,
+        evaluation,
+        verdict.id
+      )
 
       if (error || !data) {
         setStatus(error ?? 'Failed to regenerate verdict.')
@@ -285,33 +289,7 @@ export default function Dashboard({ session }: DashboardProps) {
               <span className="toggle-label">Scoring model</span>
               <div className="segmented-toggle" role="radiogroup" aria-label="Scoring model">
                 <label>
-                  <input
-                    type="radio"
-                    name="verdict-algorithm"
-                    value="standard"
-                    checked={verdictAlgorithm === 'standard'}
-                    onChange={() => setVerdictAlgorithm('standard')}
-                  />
-                  <span>Standard logistic</span>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="verdict-algorithm"
-                    value="cost_sensitive_iso"
-                    checked={verdictAlgorithm === 'cost_sensitive_iso'}
-                    onChange={() => setVerdictAlgorithm('cost_sensitive_iso')}
-                  />
-                  <span>Cost-sensitive isotonic</span>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="verdict-algorithm"
-                    value="llm_only"
-                    checked={verdictAlgorithm === 'llm_only'}
-                    onChange={() => setVerdictAlgorithm('llm_only')}
-                  />
+                  <input type="radio" name="verdict-algorithm" value="llm_only" checked readOnly />
                   <span>LLM only</span>
                 </label>
               </div>

@@ -19,7 +19,9 @@ import {
   getVerdictHistory,
   updateVerdictDecision,
   deleteVerdict,
-  regenerateVerdict,
+  evaluatePurchase,
+  submitVerdict,
+  inputFromVerdict,
 } from '../api/verdictService'
 import {
   getPurchaseHistory,
@@ -537,7 +539,14 @@ export default function Profile({ session }: ProfileProps) {
 
     try {
       const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
-      const { data, error } = await regenerateVerdict(session.user.id, verdict, openaiApiKey)
+      const input = inputFromVerdict(verdict)
+      const evaluation = await evaluatePurchase(session.user.id, input, openaiApiKey)
+      const { data, error } = await submitVerdict(
+        session.user.id,
+        input,
+        evaluation,
+        verdict.id
+      )
 
       if (error || !data) {
         setStatus(error ?? 'Failed to regenerate verdict.')

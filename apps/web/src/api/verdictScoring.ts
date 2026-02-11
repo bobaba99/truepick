@@ -2,49 +2,10 @@ import type {
   EvaluationResult,
   PurchaseInput,
   ScoreExplanation,
-  VerdictAlgorithm,
   VerdictOutcome,
   VendorMatch,
 } from './types'
-import { clamp01 } from './utils'
-
-const BASE_WEIGHTS = {
-  // Original 6 features
-  intercept: 0.627685,
-  value_conflict: 2.438147,
-  pattern_repetition: -2.792755,
-  emotional_impulse: 1.275967,
-  financial_strain: 0.982964,
-  longTerm_utility: -2.244344,
-  emotional_support: -1.444325,
-
-  // NEW: Personality traits
-  neuroticism: 1.919056,
-  materialism: 0.554621,
-  locus_of_control: 1.023947,
-} as const
-
-export const WEIGHTS = BASE_WEIGHTS
-const COST_SENSITIVE_WEIGHTS = BASE_WEIGHTS
-
-const COST_SENSITIVE_THRESHOLDS = {
-  buy: 0.35,
-  skip: 0.65,
-} as const
-
-const COST_SENSITIVE_CALIBRATION: Array<[number, number]> = [
-  [0.0, 0.0],
-  [0.1, 0.0],
-  [0.2, 0.0],
-  [0.3, 0.0],
-  [0.35, 0.2],
-  [0.45, 0.25],
-  [0.55, 0.35],
-  [0.65, 0.45],
-  [0.75, 0.6],
-  [0.85, 0.8],
-  [1.0, 1.0],
-]
+import { clamp01, computePriceThresholds } from './utils'
 
 export const VENDOR_RUBRIC = {
   quality: {
@@ -180,144 +141,6 @@ export const buildScore = (score: number, explanation: string): ScoreExplanation
   explanation,
 })
 
-export const computeDecisionScore = (params: {
-  valueConflict: number
-  patternRepetition: number
-  emotionalImpulse: number
-  financialStrain: number
-  longTermUtility: number
-  emotionalSupport: number
-  neuroticism: number
-  materialism: number
-  locusOfControl: number
-}) => {
-  return (
-    WEIGHTS.intercept +
-    WEIGHTS.value_conflict * params.valueConflict +
-    WEIGHTS.pattern_repetition * params.patternRepetition +
-    WEIGHTS.emotional_impulse * params.emotionalImpulse +
-    WEIGHTS.financial_strain * params.financialStrain -
-    WEIGHTS.longTerm_utility * params.longTermUtility -
-    WEIGHTS.emotional_support * params.emotionalSupport +
-    WEIGHTS.neuroticism * params.neuroticism +
-    WEIGHTS.materialism * params.materialism +
-    WEIGHTS.locus_of_control * params.locusOfControl
-  )
-}
-
-const sigmoid = (logit: number) => 1 / (1 + Math.exp(-logit))
-
-const calibrateProbability = (rawProb: number) => {
-  if (rawProb <= 0) return 0
-  if (rawProb >= 1) return 1
-
-  let lower = COST_SENSITIVE_CALIBRATION[0]
-  let upper = COST_SENSITIVE_CALIBRATION[COST_SENSITIVE_CALIBRATION.length - 1]
-
-  for (let i = 0; i < COST_SENSITIVE_CALIBRATION.length - 1; i += 1) {
-    const [rawLower] = COST_SENSITIVE_CALIBRATION[i]
-    const [rawUpper] = COST_SENSITIVE_CALIBRATION[i + 1]
-    if (rawProb >= rawLower && rawProb <= rawUpper) {
-      lower = COST_SENSITIVE_CALIBRATION[i]
-      upper = COST_SENSITIVE_CALIBRATION[i + 1]
-      break
-    }
-  }
-
-  const [rawLow, calLow] = lower
-  const [rawHigh, calHigh] = upper
-  if (rawHigh === rawLow) return calLow
-
-  const t = (rawProb - rawLow) / (rawHigh - rawLow)
-  return calLow + t * (calHigh - calLow)
-}
-
-const costSensitiveDecisionFromScore = (calProb: number): VerdictOutcome => {
-  if (calProb >= COST_SENSITIVE_THRESHOLDS.skip) return 'skip'
-  if (calProb >= COST_SENSITIVE_THRESHOLDS.buy) return 'hold'
-  return 'buy'
-}
-
-const costSensitiveConfidenceFromScore = (calProb: number, decision: VerdictOutcome) => {
-  const { buy, skip } = COST_SENSITIVE_THRESHOLDS
-  const holdMid = (buy + skip) / 2
-
-  if (decision === 'buy') {
-    const normalized = (buy - calProb) / buy
-    return Math.min(0.95, 0.5 + 0.45 * normalized)
-  }
-  if (decision === 'skip') {
-    const normalized = (calProb - skip) / (1 - skip)
-    return Math.min(0.95, 0.5 + 0.45 * normalized)
-  }
-
-  const maxDist = (skip - buy) / 2
-  const distFromMid = Math.abs(calProb - holdMid)
-  return Math.max(0.5, 0.9 - 0.4 * (distFromMid / maxDist))
-}
-
-const computeCostSensitiveScore = (params: {
-  valueConflict: number
-  patternRepetition: number
-  emotionalImpulse: number
-  financialStrain: number
-  longTermUtility: number
-  emotionalSupport: number
-  neuroticism: number
-  materialism: number
-  locusOfControl: number
-}) => {
-  const logit =
-    COST_SENSITIVE_WEIGHTS.intercept +
-    COST_SENSITIVE_WEIGHTS.value_conflict * params.valueConflict +
-    COST_SENSITIVE_WEIGHTS.pattern_repetition * params.patternRepetition +
-    COST_SENSITIVE_WEIGHTS.emotional_impulse * params.emotionalImpulse +
-    COST_SENSITIVE_WEIGHTS.financial_strain * params.financialStrain +
-    COST_SENSITIVE_WEIGHTS.longTerm_utility * params.longTermUtility +
-    COST_SENSITIVE_WEIGHTS.emotional_support * params.emotionalSupport +
-    COST_SENSITIVE_WEIGHTS.neuroticism * params.neuroticism +
-    COST_SENSITIVE_WEIGHTS.materialism * params.materialism +
-    COST_SENSITIVE_WEIGHTS.locus_of_control * params.locusOfControl
-
-  const rawProb = sigmoid(logit)
-  const calProb = calibrateProbability(rawProb)
-  return { rawProb, calProb }
-}
-
-export const computeDecisionByAlgorithm = (
-  algorithm: VerdictAlgorithm,
-  params: {
-    valueConflict: number
-    patternRepetition: number
-    emotionalImpulse: number
-    financialStrain: number
-    longTermUtility: number
-    emotionalSupport: number
-    neuroticism: number
-    materialism: number
-    locusOfControl: number
-  }
-) => {
-  if (algorithm === 'cost_sensitive_iso') {
-    const { rawProb, calProb } = computeCostSensitiveScore(params)
-    const outcome = costSensitiveDecisionFromScore(calProb)
-    return {
-      outcome,
-      confidence: costSensitiveConfidenceFromScore(calProb, outcome),
-      decisionScore: calProb,
-      rawScore: rawProb,
-    }
-  }
-
-  const decisionScore = computeDecisionScore(params)
-  const outcome = decisionFromScore(decisionScore)
-  return {
-    outcome,
-    confidence: confidenceFromScore(decisionScore),
-    decisionScore,
-  }
-}
-
 export const decisionFromScore = (score: number): VerdictOutcome => {
   if (score >= 0.7) return 'skip'
   if (score >= 0.4) return 'hold'
@@ -353,19 +176,20 @@ export const evaluatePurchaseFallback = (
       materialism: number
       locusOfControl: number
     }
-    algorithm?: VerdictAlgorithm
+    weeklyBudget?: number | null
   }
 ): EvaluationResult => {
   const reasons: string[] = []
   let riskScore = 0
 
+  const { high, medium } = computePriceThresholds(overrides?.weeklyBudget ?? null)
   if (input.price !== null) {
-    if (input.price > 200) {
+    if (input.price >= high) {
       riskScore += 30
-      reasons.push('High price point (>$200)')
-    } else if (input.price > 100) {
+      reasons.push(`High price point (>=$${high.toFixed(0)})`)
+    } else if (input.price >= medium) {
       riskScore += 15
-      reasons.push('Moderate price point ($100-200)')
+      reasons.push(`Moderate price point ($${medium.toFixed(0)}-$${high.toFixed(0)})`)
     }
   }
 
@@ -414,23 +238,13 @@ export const evaluatePurchaseFallback = (
   const financialStrain =
     overrides?.financialStrain ??
     buildScore(0, 'No budget context in fallback.')
-  const effectiveAlgorithm =
-    overrides?.algorithm === 'llm_only' ? 'standard' : (overrides?.algorithm ?? 'standard')
-
-  const decisionResult = computeDecisionByAlgorithm(
-    effectiveAlgorithm,
-    {
-      valueConflict: valueConflict.score,
-      patternRepetition: patternRepetition.score,
-      emotionalImpulse: emotionalImpulse.score,
-      financialStrain: financialStrain.score,
-      longTermUtility: longTermUtility.score,
-      emotionalSupport: emotionalSupport.score,
-      neuroticism: overrides?.psychScores?.neuroticism ?? 0,
-      materialism: overrides?.psychScores?.materialism ?? 0,
-      locusOfControl: overrides?.psychScores?.locusOfControl ?? 0,
-    }
-  )
+  const decisionScore = normalizedRisk
+  const outcome = decisionFromScore(decisionScore)
+  const decisionResult = {
+    outcome,
+    confidence: confidenceFromScore(decisionScore),
+    decisionScore,
+  }
 
   const alternativeSolution =
     decisionResult.outcome === 'buy' ? null : buildAlternativeSolution(input)
@@ -501,7 +315,7 @@ export const evaluatePurchaseFallback = (
       alternativeSolution: alternativeSolution ?? undefined,
       rationale,
       importantPurchase: input.isImportant,
-      algorithm: overrides?.algorithm ?? 'standard',
+      algorithm: 'llm_only',
     },
   }
 }

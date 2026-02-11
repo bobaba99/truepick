@@ -20,10 +20,9 @@ import { buildSystemPrompt, buildUserPrompt } from './verdictPrompts'
 import {
   buildScore,
   computeFinancialStrain,
-  computeDecisionByAlgorithm,
   evaluatePurchaseFallback,
 } from './verdictScoring'
-import { clamp01 } from './utils'
+import { clamp01, classifyPriceTier } from './utils'
 
 const SUPPORTED_VERDICTS: VerdictOutcome[] = ['buy', 'hold', 'skip']
 
@@ -36,9 +35,7 @@ const isVerdictOutcome = (value: unknown): value is VerdictOutcome => {
   return typeof value === 'string' && SUPPORTED_VERDICTS.includes(value as VerdictOutcome)
 }
 
-const getFallbackAlgorithm = (algorithm: VerdictAlgorithm): VerdictAlgorithm => {
-  return algorithm === 'llm_only' ? 'standard' : algorithm
-}
+const ACTIVE_ALGORITHM: VerdictAlgorithm = 'llm_only'
 
 const OUTCOME_RATIONALE_LABEL: Record<VerdictOutcome, string> = {
   buy: 'buy now',
@@ -51,7 +48,7 @@ const alignRationaleWithOutcome = (outcome: VerdictOutcome, rationale: string) =
   const strippedRationale = trimmedRationale
     .replace(/^(?:\s*outcome\s*:\s*[^.]+\.?\s*)+/i, '')
     .replace(
-      /^(?:\s*(?:outcome\s*\+\s*primary reason|primary reason|recommendation)\s*[:\-]\s*)+/i,
+      /^(?:\s*(?:outcome\s*\+\s*primary reason|primary reason|recommendation)\s*[:-]\s*)+/i,
       ''
     )
     .replace(
@@ -86,13 +83,15 @@ const hasPromptTemplateLeak = (text: unknown) => {
 
   const normalized = text.toLowerCase()
   const leakMarkers = [
-    '<write a personalized',
-    'critical: do not just list facts',
-    'structure:',
-    'outcome + primary reason',
+    'respond with this exact json',
+    'score constraints:',
+    'every field is required',
     'use a warm, conversational tone',
-    'example: we',
-    '<2-3 sentences offering an alternative',
+    'do not include section headers',
+    'one sentence, friendly and neutral',
+    'number 0.0-1.0',
+    'important purchase policy (applies',
+    'exactly one of: buy, hold, skip',
   ]
   return leakMarkers.some((marker) => normalized.includes(marker))
 }
@@ -100,7 +99,8 @@ const hasPromptTemplateLeak = (text: unknown) => {
 const isEssentialImportantHighUtilityPurchase = (
   input: PurchaseInput,
   llmResponse: LLMEvaluationResponse,
-  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null
+  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null,
+  weeklyBudget: number | null
 ) => {
   if (!input.isImportant) {
     return false
@@ -121,8 +121,9 @@ const isEssentialImportantHighUtilityPurchase = (
   const hasStrongLongTermUtility =
     typeof llmResponse.long_term_utility?.score === 'number' &&
     llmResponse.long_term_utility.score >= 0.65
+  const priceTier = classifyPriceTier(input.price, weeklyBudget)
   const hasHighPriceOrPremiumTier =
-    (typeof input.price === 'number' && input.price >= 200) ||
+    priceTier === 'high' ||
     vendorPriceTier === 'premium' ||
     vendorPriceTier === 'luxury'
 
@@ -132,7 +133,8 @@ const isEssentialImportantHighUtilityPurchase = (
 const validateImportantPurchaseLlmOnlyRationale = (
   input: PurchaseInput,
   llmResponse: LLMEvaluationResponse,
-  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null
+  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null,
+  weeklyBudget: number | null
 ): { isValid: boolean; reason?: string } => {
   if (!input.isImportant) {
     return { isValid: true }
@@ -202,7 +204,7 @@ const validateImportantPurchaseLlmOnlyRationale = (
 
   if (
     llmResponse.verdict === 'skip' &&
-    isEssentialImportantHighUtilityPurchase(input, llmResponse, vendorPriceTier)
+    isEssentialImportantHighUtilityPurchase(input, llmResponse, vendorPriceTier, weeklyBudget)
   ) {
     return {
       isValid: false,
@@ -369,47 +371,9 @@ export async function deleteVerdict(
   return { error: error?.message ?? null }
 }
 
-export async function createVerdict(
-  userId: string,
-  input: PurchaseInput,
-  evaluation: EvaluationResult
-): Promise<{ error: string | null }> {
-  const vendorMatch = await retrieveVendorMatch(input)
-  const scoringModel = evaluation.reasoning?.algorithm ?? 'standard'
-  const holdReleaseAt =
-    evaluation.outcome === 'hold'
-      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      : null
-
-  const { error } = await supabase.from('verdicts').insert({
-    user_id: userId,
-    candidate_title: input.title,
-    candidate_price: input.price,
-    candidate_category: input.category,
-    candidate_vendor: input.vendor,
-    candidate_vendor_id: vendorMatch?.vendor_id ?? null,
-    scoring_model: scoringModel,
-    justification: input.justification,
-    predicted_outcome: evaluation.outcome,
-    confidence_score: evaluation.confidence,
-    reasoning: evaluation.reasoning,
-    hold_release_at: holdReleaseAt,
-  })
-
-  return { error: error?.message ?? null }
-}
-
-export async function regenerateVerdict(
-  userId: string,
-  verdict: VerdictRow,
-  openaiApiKey?: string
-): Promise<{ data: VerdictRow | null; error: string | null }> {
-  if (!openaiApiKey) {
-    return { data: null, error: 'Regenerate requires a configured OpenAI API key.' }
-  }
-
+export function inputFromVerdict(verdict: VerdictRow): PurchaseInput {
   const reasoning = verdict.reasoning as { importantPurchase?: boolean } | null
-  const input: PurchaseInput = {
+  return {
     title: verdict.candidate_title,
     price: verdict.candidate_price ?? null,
     category: verdict.candidate_category ?? null,
@@ -417,32 +381,53 @@ export async function regenerateVerdict(
     justification: verdict.justification ?? null,
     isImportant: reasoning?.importantPurchase ?? false,
   }
+}
 
-  const algorithm = verdict.scoring_model ?? 'standard'
-  const evaluation = await evaluatePurchase(userId, input, openaiApiKey, algorithm, {
-    isRegeneration: true,
-  })
+export async function submitVerdict(
+  userId: string,
+  input: PurchaseInput,
+  evaluation: EvaluationResult,
+  existingVerdictId?: string
+): Promise<{ data: VerdictRow | null; error: string | null }> {
   const vendorMatch = await retrieveVendorMatch(input)
   const holdReleaseAt =
     evaluation.outcome === 'hold'
       ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       : null
 
-  const { error } = await supabase
-    .from('verdicts')
-    .update({
-      candidate_vendor_id: vendorMatch?.vendor_id ?? null,
-      scoring_model: algorithm,
-      predicted_outcome: evaluation.outcome,
-      confidence_score: evaluation.confidence,
-      reasoning: evaluation.reasoning,
-      hold_release_at: holdReleaseAt,
-    })
-    .eq('id', verdict.id)
-    .eq('user_id', userId)
+  const verdictPayload = {
+    candidate_vendor_id: vendorMatch?.vendor_id ?? null,
+    scoring_model: ACTIVE_ALGORITHM,
+    predicted_outcome: evaluation.outcome,
+    confidence_score: evaluation.confidence,
+    reasoning: evaluation.reasoning,
+    hold_release_at: holdReleaseAt,
+  }
 
-  if (error) {
-    return { data: null, error: error.message }
+  if (existingVerdictId) {
+    const { error } = await supabase
+      .from('verdicts')
+      .update(verdictPayload)
+      .eq('id', existingVerdictId)
+      .eq('user_id', userId)
+
+    if (error) {
+      return { data: null, error: error.message }
+    }
+  } else {
+    const { error } = await supabase.from('verdicts').insert({
+      user_id: userId,
+      candidate_title: input.title,
+      candidate_price: input.price,
+      candidate_category: input.category,
+      candidate_vendor: input.vendor,
+      justification: input.justification,
+      ...verdictPayload,
+    })
+
+    if (error) {
+      return { data: null, error: error.message }
+    }
   }
 
   const { data, error: fetchError } = await supabase
@@ -450,8 +435,9 @@ export async function regenerateVerdict(
     .select(
       'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
     )
-    .eq('id', verdict.id)
     .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (fetchError) {
@@ -464,11 +450,7 @@ export async function regenerateVerdict(
 export async function evaluatePurchase(
   userId: string,
   input: PurchaseInput,
-  openaiApiKey?: string,
-  algorithm: VerdictAlgorithm = 'standard',
-  regeneration?: {
-    isRegeneration: boolean
-  }
+  openaiApiKey?: string
 ): Promise<EvaluationResult> {
   const vendorMatch = await retrieveVendorMatch(input)
   const { data: profile } = await supabase
@@ -477,19 +459,21 @@ export async function evaluatePurchase(
     .eq('id', userId)
     .maybeSingle()
 
+  const weeklyBudget: number | null = profile?.weekly_fun_budget ?? null
+
   const psychScores = computePsychScores(
     (profile?.onboarding_answers as OnboardingAnswers | null | undefined) ?? null
   )
 
   const financialStrainValue = computeFinancialStrain(
     input.price,
-    profile?.weekly_fun_budget ?? null,
+    weeklyBudget,
     input.isImportant
   )
   const financialStrain = buildScore(
     financialStrainValue,
-    profile?.weekly_fun_budget
-      ? `Relative to weekly fun budget of $${profile.weekly_fun_budget.toFixed(2)}.`
+    weeklyBudget
+      ? `Relative to weekly fun budget of $${weeklyBudget.toFixed(2)}.`
       : 'No weekly fun budget set.'
   )
 
@@ -508,7 +492,7 @@ export async function evaluatePurchase(
     retrieveSimilarPurchases(userId, input, 5, openaiApiKey, { ratingWindow: 'long_term' }),
   ])
 
-  const buildFallbackOverrides = (fallbackAlgorithm: VerdictAlgorithm) => ({
+  const buildFallbackOverrides = () => ({
     patternRepetition,
     financialStrain,
     vendorMatch,
@@ -516,12 +500,12 @@ export async function evaluatePurchase(
     similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
     recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
     psychScores,
-    algorithm: fallbackAlgorithm,
+    weeklyBudget,
   })
 
   if (!openaiApiKey) {
     console.warn('No OpenAI API key provided, using fallback evaluation')
-    return evaluatePurchaseFallback(input, buildFallbackOverrides(getFallbackAlgorithm(algorithm)))
+    return evaluatePurchaseFallback(input, buildFallbackOverrides())
   }
 
   try {
@@ -534,20 +518,16 @@ export async function evaluatePurchase(
       similarLongTermPurchases,
       longTermRatedPurchases,
       vendorMatch,
-      algorithm
+      weeklyBudget
     )
-    const maxAttempts =
-      regeneration?.isRegeneration || (algorithm === 'llm_only' && input.isImportant) ? 2 : 1
+    const maxAttempts = 2
     let retryReason = ''
     let llmResponse: LLMEvaluationResponse | null = null
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const importantPurchaseRetryInstruction =
-        algorithm === 'llm_only' && input.isImportant
-          ? `\nFor important purchases and essential items, high price/premium tier is tolerated unless there is poor long-term utility evidence.
-          If it is a high price/premium tier purchase with long-term utility and essential, approve the purchase regardless of value conflicts and high upfront cost,
-          add a suggestion for financing options, but never return a 'skip' verdict.`
-          : ''
+      const retryContext = retryReason
+        ? `\nYour previous response was rejected: ${retryReason} Please fix this issue in your next response.`
+        : ''
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -561,7 +541,7 @@ export async function evaluatePurchase(
             { role: 'system', content: systemPrompt },
             {
               role: 'user',
-              content: `${userPrompt}${importantPurchaseRetryInstruction}`,
+              content: `${userPrompt}${retryContext}`,
             },
           ],
           max_completion_tokens: 4000,
@@ -610,11 +590,12 @@ export async function evaluatePurchase(
         throw new Error('LLM response contained prompt template text.')
       }
 
-      if (algorithm === 'llm_only' && input.isImportant) {
+      if (input.isImportant) {
         const validation = validateImportantPurchaseLlmOnlyRationale(
           input,
           candidateResponse,
-          vendorMatch?.vendor_price_tier ?? null
+          vendorMatch?.vendor_price_tier ?? null,
+          weeklyBudget
         )
         if (!validation.isValid) {
           retryReason = validation.reason ?? 'Policy validation failed.'
@@ -663,62 +644,28 @@ export async function evaluatePurchase(
       typeof llmResponse.confidence !== 'number' ||
       !Number.isFinite(llmResponse.confidence)
     ) {
-      return evaluatePurchaseFallback(input, buildFallbackOverrides(getFallbackAlgorithm(algorithm)))
+      return evaluatePurchaseFallback(input, buildFallbackOverrides())
     }
 
-    if (algorithm === 'llm_only') {
-      const shouldForceApprove =
-        llmResponse.verdict === 'skip' &&
-        isEssentialImportantHighUtilityPurchase(
-          input,
-          llmResponse,
-          vendorMatch?.vendor_price_tier ?? null
-        )
-      const llmOnlyVerdict: VerdictOutcome = shouldForceApprove ? 'buy' : llmResponse.verdict
-      const llmOnlyConfidence = shouldForceApprove
-        ? clamp01(Math.max(llmResponse.confidence, 0.65))
-        : clamp01(llmResponse.confidence)
-      const llmOnlyRationale = shouldForceApprove
-        ? `${llmResponse.rationale} This is treated as an essential important purchase with strong long-term utility, so never return a skip outcome. Add a suggestion for financing options.`
-        : llmResponse.rationale
-
-      return {
-        outcome: llmOnlyVerdict,
-        confidence: llmOnlyConfidence,
-        reasoning: {
-          valueConflict,
-          patternRepetition,
-          emotionalImpulse,
-          financialStrain,
-          longTermUtility,
-          emotionalSupport,
-          shortTermRegret,
-          longTermRegret,
-          alternativeSolution: llmResponse.alternative_solution,
-          rationale: alignRationaleWithOutcome(llmOnlyVerdict, llmOnlyRationale),
-          importantPurchase: input.isImportant,
-          algorithm,
-        },
-      }
-    }
-
-    const decisionResult = computeDecisionByAlgorithm(algorithm, {
-      valueConflict: valueConflict.score,
-      patternRepetition: patternRepetition.score,
-      emotionalImpulse: emotionalImpulse.score,
-      financialStrain: financialStrain.score,
-      longTermUtility: longTermUtility.score,
-      emotionalSupport: emotionalSupport.score,
-      neuroticism: psychScores.neuroticism,
-      materialism: psychScores.materialism,
-      locusOfControl: psychScores.locusOfControl,
-    })
-    const finalOutcome = llmResponse.verdict
-    const finalConfidence = clamp01(llmResponse.confidence)
+    const shouldForceApprove =
+      llmResponse.verdict === 'skip' &&
+      isEssentialImportantHighUtilityPurchase(
+        input,
+        llmResponse,
+        vendorMatch?.vendor_price_tier ?? null,
+        weeklyBudget
+      )
+    const overriddenVerdict: VerdictOutcome = shouldForceApprove ? 'buy' : llmResponse.verdict
+    const overriddenConfidence = shouldForceApprove
+      ? clamp01(Math.max(llmResponse.confidence, 0.65))
+      : clamp01(llmResponse.confidence)
+    const overriddenRationale = shouldForceApprove
+      ? `${llmResponse.rationale} This is treated as an essential important purchase with strong long-term utility, so never return a skip outcome. Add a suggestion for financing options.`
+      : llmResponse.rationale
 
     return {
-      outcome: finalOutcome,
-      confidence: finalConfidence,
+      outcome: overriddenVerdict,
+      confidence: overriddenConfidence,
       reasoning: {
         valueConflict,
         patternRepetition,
@@ -729,15 +676,14 @@ export async function evaluatePurchase(
         shortTermRegret,
         longTermRegret,
         alternativeSolution: llmResponse.alternative_solution,
-        decisionScore: decisionResult.decisionScore,
-        rationale: alignRationaleWithOutcome(finalOutcome, llmResponse.rationale),
+        rationale: alignRationaleWithOutcome(overriddenVerdict, overriddenRationale),
         importantPurchase: input.isImportant,
-        algorithm,
+        algorithm: ACTIVE_ALGORITHM,
       },
     }
   } catch (error) {
     console.error('LLM evaluation failed, using fallback:', error)
-    return evaluatePurchaseFallback(input, buildFallbackOverrides(getFallbackAlgorithm(algorithm)))
+    return evaluatePurchaseFallback(input, buildFallbackOverrides())
   }
 }
 

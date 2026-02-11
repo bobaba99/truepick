@@ -240,15 +240,14 @@ export const USER_VALUE_DESCRIPTIONS: Record<UserValueType, string> = {
 }
 
 export const PURCHASE_CATEGORIES = [
-  { value: 'uncategorized', label: 'Uncategorized' },
   { value: 'electronics', label: 'Electronics' },
   { value: 'fashion', label: 'Fashion' },
-  { value: 'home_goods', label: 'Home goods' },
-  { value: 'health_wellness', label: 'Health & wellness' },
+  { value: 'home goods', label: 'Home goods' },
+  { value: 'health & wellness', label: 'Health & wellness' },
   { value: 'travel', label: 'Travel' },
   { value: 'experiences', label: 'Experiences' },
   { value: 'subscriptions', label: 'Subscriptions' },
-  { value: 'food_beverage', label: 'Food & beverage' },
+  { value: 'food & beverage', label: 'Food & beverage' },
   { value: 'services', label: 'Services' },
   { value: 'education', label: 'Education' },
   { value: 'other', label: 'Other' },
