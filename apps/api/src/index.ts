@@ -126,10 +126,6 @@ app.post('/admin/resources', requireAdmin, async (req, res) => {
     res.status(400).json({ error: 'Body content is required.' })
     return
   }
-  if (!body.category?.trim()) {
-    res.status(400).json({ error: 'Category is required.' })
-    return
-  }
   if (!Array.isArray(body.tags) || body.tags.length === 0) {
     res.status(400).json({ error: 'At least one tag is required.' })
     return
@@ -141,7 +137,6 @@ app.post('/admin/resources', requireAdmin, async (req, res) => {
       title: body.title.trim(),
       summary: body.summary.trim(),
       body_markdown: body.bodyMarkdown.trim(),
-      category: body.category.trim(),
       tags: body.tags,
       reading_time_minutes: body.readingTimeMinutes ?? null,
       canonical_url: body.canonicalUrl?.trim() || null,
@@ -186,10 +181,6 @@ app.put('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
     res.status(400).json({ error: 'Body content is required.' })
     return
   }
-  if (!body.category?.trim()) {
-    res.status(400).json({ error: 'Category is required.' })
-    return
-  }
   if (!Array.isArray(body.tags) || body.tags.length === 0) {
     res.status(400).json({ error: 'At least one tag is required.' })
     return
@@ -201,7 +192,6 @@ app.put('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
       title: body.title.trim(),
       summary: body.summary.trim(),
       body_markdown: body.bodyMarkdown.trim(),
-      category: body.category.trim(),
       tags: body.tags,
       reading_time_minutes: body.readingTimeMinutes ?? null,
       canonical_url: body.canonicalUrl?.trim() || null,

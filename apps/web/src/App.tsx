@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Swipe from './pages/Swipe'
 import Profile from './pages/Profile'
 import Resources from './pages/Resources'
+import ResourceDetail from './pages/ResourceDetail'
 import AdminResources from './pages/AdminResources'
 import './styles/App.css'
 import { CustomCursor, useGSAPLoader, LiquidButton, VolumetricInput } from './components/Kinematics'
@@ -377,6 +378,7 @@ function App() {
             />
             <Route element={<AppShell />}>
               <Route path="/resources" element={<Resources />} />
+              <Route path="/resources/:slug" element={<ResourceDetail />} />
             </Route>
 
             <Route element={<RequireAuth session={session} />}>
