@@ -31,6 +31,7 @@ import {
 } from '../api/purchaseService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
+import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 import ListFilters from '../components/ListFilters'
 import { type FilterState, INITIAL_FILTERS } from '../components/ListFilters.model'
 
@@ -171,6 +172,7 @@ export default function Profile({ session }: ProfileProps) {
     useState<OnboardingAnswers>(DEFAULT_ONBOARDING)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [emailImportModalOpen, setEmailImportModalOpen] = useState(false)
 
   const materialismAverage =
     (onboardingAnswers.materialism.centrality +
@@ -876,6 +878,13 @@ export default function Profile({ session }: ProfileProps) {
               <LiquidButton
                 type="button"
                 className="ghost"
+                onClick={() => setEmailImportModalOpen(true)}
+              >
+                Import from email
+              </LiquidButton>
+              <LiquidButton
+                type="button"
+                className="ghost"
                 onClick={() => {
                   resetPurchaseForm()
                   setPurchaseModalMode('add')
@@ -1376,6 +1385,87 @@ export default function Profile({ session }: ProfileProps) {
                   className="ghost"
                   type="button"
                   onClick={() => setProfileModalOpen(false)}
+                >
+                  Close
+                </LiquidButton>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {emailImportModalOpen && createPortal(
+        <div
+          className="modal-backdrop"
+          onClick={(event: MouseEvent<HTMLDivElement>) => {
+            if (event.target === event.currentTarget) {
+              setEmailImportModalOpen(false)
+            }
+          }}
+          onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+            if (event.key === 'Escape') {
+              setEmailImportModalOpen(false)
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>Import from email</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setEmailImportModalOpen(false)}
+                aria-label="Close modal"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="quiz-section">
+                <p className="import-description">
+                  Connect your email to automatically import recent purchase receipts.
+                </p>
+                
+                <div className="import-options">
+                  <button
+                    type="button"
+                    className="import-option-btn gmail"
+                    onClick={() => alert('Gmail API integration coming soon!')}
+                  >
+                    <GmailLogo className="import-logo" />
+                    <span className="import-label">Connect Gmail</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    className="import-option-btn outlook"
+                    onClick={() => alert('Outlook API integration coming soon!')}
+                  >
+                    <OutlookLogo className="import-logo" />
+                    <span className="import-label">Connect Outlook</span>
+                  </button>
+                </div>
+                
+                <div className="import-privacy-notice">
+                  <p>🔒 <strong>Privacy Notice:</strong></p>
+                  <p>
+                    The API only reads the last 10 purchase receipts and does not store data 
+                    other than item name, price, vendor, category, and date for the purchases.
+                    One time connection only. Reimporting would require your manual authorization again.
+                    Read more on how we fetch your reciepts.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="values-actions">
+                <LiquidButton
+                  className="ghost"
+                  type="button"
+                  onClick={() => setEmailImportModalOpen(false)}
                 >
                   Close
                 </LiquidButton>

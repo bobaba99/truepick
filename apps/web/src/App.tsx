@@ -8,6 +8,14 @@ import Profile from './pages/Profile'
 import Resources from './pages/Resources'
 import ResourceDetail from './pages/ResourceDetail'
 import AdminResources from './pages/AdminResources'
+import About from './pages/About'
+import Support from './pages/Support'
+import FAQ from './pages/FAQ'
+import Contact from './pages/Contact'
+import HowItWorks from './pages/HowItWorks'
+import EmailSync from './pages/EmailSync'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 import './styles/App.css'
 import { CustomCursor, useGSAPLoader, LiquidButton, VolumetricInput } from './components/Kinematics'
 
@@ -329,6 +337,12 @@ function App() {
             <NavLink to="/resources" className="nav-link">
               Resources
             </NavLink>
+            <NavLink to="/about" className="nav-link">
+              About
+            </NavLink>
+            <NavLink to="/support" className="nav-link">
+              Support
+            </NavLink>
           </nav>
           <div className="top-actions">
             {session ? (
@@ -379,6 +393,14 @@ function App() {
             <Route element={<AppShell />}>
               <Route path="/resources" element={<Resources />} />
               <Route path="/resources/:slug" element={<ResourceDetail />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/contact-us" element={<Contact />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/email-sync" element={<EmailSync />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
             </Route>
 
             <Route element={<RequireAuth session={session} />}>
