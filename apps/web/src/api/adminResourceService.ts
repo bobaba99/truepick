@@ -7,14 +7,27 @@ type ResourceUpsertInput = {
   title: string
   summary: string
   bodyMarkdown: string
-  category: string | null
+  category: string
   tags: string[]
-  readingTimeMinutes: number | null
   canonicalUrl: string | null
   coverImageUrl: string | null
   ctaUrl: string | null
   isPublished: boolean
   publishedAt: string | null
+}
+
+const WORDS_PER_MINUTE = 200
+
+const stripHtml = (html: string): string => {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
+const calculateReadingTime = (title: string, summary: string, bodyMarkdown: string): number => {
+  const text = `${title} ${summary} ${stripHtml(bodyMarkdown)}`
+  const wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length
+  return Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE))
 }
 
 const withAuthHeaders = (accessToken: string, extraHeaders?: Record<string, string>) => ({
@@ -49,10 +62,11 @@ export async function createAdminResource(
   accessToken: string,
   input: ResourceUpsertInput
 ): Promise<ResourceRow> {
+  const readingTimeMinutes = calculateReadingTime(input.title, input.summary, input.bodyMarkdown)
   const response = await fetch(`${API_BASE_URL}/admin/resources`, {
     method: 'POST',
     headers: withAuthHeaders(accessToken, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, readingTimeMinutes }),
   })
   await assertOk(response)
   const payload = (await response.json()) as { data: ResourceRow }
@@ -64,10 +78,11 @@ export async function updateAdminResource(
   resourceId: string,
   input: ResourceUpsertInput
 ): Promise<ResourceRow> {
+  const readingTimeMinutes = calculateReadingTime(input.title, input.summary, input.bodyMarkdown)
   const response = await fetch(`${API_BASE_URL}/admin/resources/${resourceId}`, {
     method: 'PUT',
     headers: withAuthHeaders(accessToken, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, readingTimeMinutes }),
   })
   await assertOk(response)
   const payload = (await response.json()) as { data: ResourceRow }

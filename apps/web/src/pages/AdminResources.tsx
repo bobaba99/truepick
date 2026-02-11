@@ -49,7 +49,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
   const [summary, setSummary] = useState('')
   const [category, setCategory] = useState('')
   const [tagsText, setTagsText] = useState('')
-  const [readingTimeMinutes, setReadingTimeMinutes] = useState('')
+
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [ctaUrl, setCtaUrl] = useState('')
@@ -69,7 +69,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
     setSummary('')
     setCategory('')
     setTagsText('')
-    setReadingTimeMinutes('')
+
     setCanonicalUrl('')
     setCoverImageUrl('')
     setCtaUrl('')
@@ -89,7 +89,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
     setSummary(resource.summary)
     setCategory(resource.category ?? '')
     setTagsText(resource.tags.join(', '))
-    setReadingTimeMinutes(resource.reading_time_minutes?.toString() ?? '')
+
     setCanonicalUrl(resource.canonical_url ?? '')
     setCoverImageUrl(resource.cover_image_url ?? '')
     setCtaUrl(resource.cta_url ?? '')
@@ -209,6 +209,20 @@ export default function AdminResources({ session }: AdminResourcesProps) {
       return
     }
 
+    if (!category.trim()) {
+      setStatus({ type: 'error', message: 'Category is required.' })
+      return
+    }
+
+    const tags = tagsText
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0)
+    if (tags.length === 0) {
+      setStatus({ type: 'error', message: 'At least one tag is required.' })
+      return
+    }
+
     if (!bodyMarkdown || bodyMarkdown === '<p><br></p>') {
       setStatus({ type: 'error', message: 'Article body is required.' })
       return
@@ -219,22 +233,14 @@ export default function AdminResources({ session }: AdminResourcesProps) {
       title: title.trim(),
       summary: summary.trim(),
       bodyMarkdown,
-      category: category.trim() || null,
-      tags: tagsText
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0),
-      readingTimeMinutes: readingTimeMinutes.trim() ? Number(readingTimeMinutes) : null,
+      category: category.trim(),
+      tags,
+
       canonicalUrl: canonicalUrl.trim() || null,
       coverImageUrl: coverImageUrl.trim() || null,
       ctaUrl: ctaUrl.trim() || null,
       isPublished,
       publishedAt,
-    }
-
-    if (payload.readingTimeMinutes !== null && payload.readingTimeMinutes <= 0) {
-      setStatus({ type: 'error', message: 'Reading time must be a positive number.' })
-      return
     }
 
     setSaving(true)
@@ -380,7 +386,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
           <h2>{selectedResource ? `Editing: ${selectedResource.title}` : 'New article'}</h2>
           <form className="decision-form" onSubmit={(event) => event.preventDefault()}>
             <label>
-              Slug
+              <span className="label-text">Slug <span className="required">*</span></span>
               <VolumetricInput
                 as="input"
                 value={slug}
@@ -391,7 +397,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               />
             </label>
             <label>
-              Title
+              <span className="label-text">Title <span className="required">*</span></span>
               <VolumetricInput
                 as="input"
                 value={title}
@@ -403,7 +409,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               />
             </label>
             <label>
-              Summary
+              <span className="label-text">Summary <span className="required">*</span></span>
               <VolumetricInput
                 as="textarea"
                 value={summary}
@@ -413,32 +419,18 @@ export default function AdminResources({ session }: AdminResourcesProps) {
                 rows={3}
               />
             </label>
-            <div className="form-row">
-              <label>
-                Category
-                <VolumetricInput
-                  as="input"
-                  value={category}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    setCategory(event.target.value)
-                  }
-                />
-              </label>
-              <label>
-                Reading time (minutes)
-                <VolumetricInput
-                  as="input"
-                  type="number"
-                  min={1}
-                  value={readingTimeMinutes}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    setReadingTimeMinutes(event.target.value)
-                  }
-                />
-              </label>
-            </div>
             <label>
-              Tags (comma separated)
+              <span className="label-text">Category <span className="required">*</span></span>
+              <VolumetricInput
+                as="input"
+                value={category}
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                  setCategory(event.target.value)
+                }
+              />
+            </label>
+            <label>
+              <span className="label-text">Tags (comma separated) <span className="required">*</span></span>
               <VolumetricInput
                 as="input"
                 value={tagsText}
@@ -449,7 +441,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               />
             </label>
             <label>
-              Canonical URL
+              <span className="label-text">Canonical URL</span>
               <VolumetricInput
                 as="input"
                 value={canonicalUrl}
@@ -490,6 +482,9 @@ export default function AdminResources({ session }: AdminResourcesProps) {
                 }
               />
               <span className="toggle-label">Published</span>
+            </div>
+            <div className="editor-label">
+              Body content <span className="required">*</span>
             </div>
             <div className="admin-editor-shell">
               <div ref={editorContainerRef} />

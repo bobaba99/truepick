@@ -8,6 +8,7 @@ This guide explains how to access the admin editor and create, edit, publish, un
 - Web app dependencies are installed.
 - API app dependencies are installed.
 - Your account email is listed as an admin email.
+- (Optional) Example articles can be seeded from `seed_resources.sql`.
 
 ## 2) Configure Environment Variables
 
@@ -60,7 +61,28 @@ Expected response:
 {"status":"ok"}
 ```
 
-## 4) Sign In as Admin
+## 4) Seed Example Articles (Optional)
+
+To populate the database with example articles about impulse buying and post-purchase dissonance:
+
+```bash
+psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -f seed_resources.sql
+```
+
+Or using Supabase CLI:
+
+```bash
+supabase db execute --file seed_resources.sql
+```
+
+This creates 5 published articles covering:
+- Neurobiology of impulse acquisition
+- Cognitive dissonance and regret
+- Choice architecture in e-commerce
+- The Halo Effect in product valuation
+- Pre-commitment mitigation strategies
+
+## 5) Sign In as Admin
 
 1. Open the web app (`http://localhost:5173`).
 2. Sign in with an email included in both:
@@ -71,39 +93,54 @@ Expected response:
 
 If the Admin tab is missing, your signed-in email is not in `VITE_ADMIN_EMAILS`.
 
-## 5) Create or Edit an Article
+## 6) Create or Edit an Article
 
 In **Admin Article Editor**:
 
 - **New article**: click **New article** and fill form fields.
 - **Edit article**: click **Edit** on an existing card.
 
-Required fields:
+### Field Reference
 
-- Slug
-- Title
-- Summary
-- Body content (rich editor)
+#### Required Fields
 
-Recommended fields:
+| Field | Description |
+|-------|-------------|
+| **Slug** | URL-friendly identifier (e.g., `impulse-buying-framework`). Used in the URL: `/resources/impulse-buying-framework`. Should be unique and lowercase with hyphens. |
+| **Title** | The article headline displayed on the article page and in listings. |
+| **Summary** | A short description/teaser of the article. Shown in article cards and SEO meta descriptions. |
+| **Body content** | The main article content written in Markdown. Supports rich formatting (headings, lists, images, links, etc.). |
+| **Category** | Broad classification (e.g., "Finance", "Psychology"). Used for grouping/filtering articles. |
+| **Tags** | Array of keywords (e.g., `["budgeting", "saving"]`). Used for related content suggestions and search. |
 
-- Category
-- Reading time
-- Tags
-- Canonical URL
-- Cover image URL
-- CTA URL
+#### Recommended Fields
+
+| Field | Description |
+|-------|-------------|
+| **Canonical URL** | If the article was originally published elsewhere, this is the original source URL. Helps with SEO to avoid duplicate content penalties. |
+| **Reading time** | Auto-calculated from word count at 200 WPM (words per minute). Displayed to users (e.g., "5 min read"). |
+| **Cover image URL** | Featured image shown at the top of the article and in article cards/listings. |
+| **CTA URL** | "Call to Action" link. Where you want readers to go after reading (e.g., sign-up page, related tool, external link). |
+
+#### System Fields (auto-managed)
+
+| Field | Description |
+|-------|-------------|
+| **is_published** | Boolean flag. `true` = visible in public `/resources` listing, `false` = draft/only admin visible. |
+| **published_at** | Timestamp when the article was first published. Set automatically when you click **Publish**. |
+| **created_at** | When the article row was first created. |
+| **updated_at** | Last modification timestamp. |
 
 Click **Save** to create/update the article as a draft.
 
-## 6) Publish and Unpublish
+## 7) Publish and Unpublish
 
 - Click **Publish** to make article publicly visible in `/resources`.
 - Click **Unpublish** to hide it from public listing.
 
 Publishing sets `is_published=true` and `published_at` timestamp.
 
-## 7) Delete an Article
+## 8) Delete an Article
 
 1. Open article in editor.
 2. Click **Delete**.
@@ -111,7 +148,7 @@ Publishing sets `is_published=true` and `published_at` timestamp.
 
 Deletion is permanent and removes the row from `resources`.
 
-## 8) Upload Images in Editor
+## 9) Upload Images in Editor
 
 Use the image button in the rich text toolbar.
 
@@ -125,7 +162,7 @@ Uploads are stored in Supabase Storage bucket `resource-images`.
 
 If upload fails, ensure bucket exists and is publicly readable.
 
-## 9) Common Troubleshooting
+## 10) Common Troubleshooting
 
 ### "Failed to fetch"
 
@@ -153,7 +190,7 @@ API process is outdated or route not loaded. Restart `apps/api`.
 
 Check API logs for Supabase credentials and auth errors, then verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 
-## 10) Verification Checklist
+## 11) Verification Checklist
 
 - [ ] Admin tab visible after sign in
 - [ ] Can save draft article

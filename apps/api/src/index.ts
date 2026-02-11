@@ -60,7 +60,7 @@ type ResourceUpsertBody = {
   title: string
   summary: string
   bodyMarkdown: string
-  category: string | null
+  category: string
   tags: string[]
   readingTimeMinutes: number | null
   canonicalUrl: string | null
@@ -111,15 +111,40 @@ app.post('/admin/resources', requireAdmin, async (req, res) => {
   const now = new Date().toISOString()
   const publishedAt = body.isPublished ? (body.publishedAt ?? now) : null
 
+  // Validate required fields
+  if (!body.slug?.trim()) {
+    res.status(400).json({ error: 'Slug is required.' })
+    return
+  }
+  if (!body.title?.trim()) {
+    res.status(400).json({ error: 'Title is required.' })
+    return
+  }
+  if (!body.summary?.trim()) {
+    res.status(400).json({ error: 'Summary is required.' })
+    return
+  }
+  if (!body.bodyMarkdown?.trim()) {
+    res.status(400).json({ error: 'Body content is required.' })
+    return
+  }
+  if (!body.category?.trim()) {
+    res.status(400).json({ error: 'Category is required.' })
+    return
+  }
+  if (!Array.isArray(body.tags) || body.tags.length === 0) {
+    res.status(400).json({ error: 'At least one tag is required.' })
+    return
+  }
   const { data, error } = await supabase()
     .from('resources')
     .insert({
-      slug: body.slug?.trim() ?? '',
-      title: body.title?.trim() ?? '',
-      summary: body.summary?.trim() ?? '',
-      body_markdown: body.bodyMarkdown ?? '',
-      category: body.category?.trim() || null,
-      tags: Array.isArray(body.tags) ? body.tags : [],
+      slug: body.slug.trim(),
+      title: body.title.trim(),
+      summary: body.summary.trim(),
+      body_markdown: body.bodyMarkdown.trim(),
+      category: body.category.trim(),
+      tags: body.tags,
       reading_time_minutes: body.readingTimeMinutes ?? null,
       canonical_url: body.canonicalUrl?.trim() || null,
       cover_image_url: body.coverImageUrl?.trim() || null,
@@ -146,15 +171,40 @@ app.put('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
   const now = new Date().toISOString()
   const publishedAt = body.isPublished ? (body.publishedAt ?? now) : null
 
+  // Validate required fields
+  if (!body.slug?.trim()) {
+    res.status(400).json({ error: 'Slug is required.' })
+    return
+  }
+  if (!body.title?.trim()) {
+    res.status(400).json({ error: 'Title is required.' })
+    return
+  }
+  if (!body.summary?.trim()) {
+    res.status(400).json({ error: 'Summary is required.' })
+    return
+  }
+  if (!body.bodyMarkdown?.trim()) {
+    res.status(400).json({ error: 'Body content is required.' })
+    return
+  }
+  if (!body.category?.trim()) {
+    res.status(400).json({ error: 'Category is required.' })
+    return
+  }
+  if (!Array.isArray(body.tags) || body.tags.length === 0) {
+    res.status(400).json({ error: 'At least one tag is required.' })
+    return
+  }
   const { data, error } = await supabase()
     .from('resources')
     .update({
-      slug: body.slug?.trim() ?? '',
-      title: body.title?.trim() ?? '',
-      summary: body.summary?.trim() ?? '',
-      body_markdown: body.bodyMarkdown ?? '',
-      category: body.category?.trim() || null,
-      tags: Array.isArray(body.tags) ? body.tags : [],
+      slug: body.slug.trim(),
+      title: body.title.trim(),
+      summary: body.summary.trim(),
+      body_markdown: body.bodyMarkdown.trim(),
+      category: body.category.trim(),
+      tags: body.tags,
       reading_time_minutes: body.readingTimeMinutes ?? null,
       canonical_url: body.canonicalUrl?.trim() || null,
       cover_image_url: body.coverImageUrl?.trim() || null,

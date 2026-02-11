@@ -2271,3 +2271,23 @@
   border: none;
   box-shadow: none;
 }
+
+/* Required field indicator */
+.required {
+  color: #ef4444;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.label-text {
+  display: inline;
+}
+
+/* Editor label for required body content */
+.editor-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-700);
+  margin-bottom: 0.4rem;
+  display: block;
+}
