@@ -187,6 +187,10 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 - **Result sharing:** generate shareable verdict cards/links for social platforms and messaging to support organic acquisition.
 - **iOS app waitlist / conversion prompts:** non-intrusive web prompts and CTA surface for future iOS premium experience.
 
+### 6.1 Future Features
+
+- **Chat with verdicts**: users can chat with the verdict in the chat interface to get personalized advice on their purchases.
+
 ---
 
 ## 7. Assumptions & Constraints

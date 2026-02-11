@@ -40,6 +40,180 @@ const getFallbackAlgorithm = (algorithm: VerdictAlgorithm): VerdictAlgorithm => 
   return algorithm === 'llm_only' ? 'standard' : algorithm
 }
 
+const OUTCOME_RATIONALE_LABEL: Record<VerdictOutcome, string> = {
+  buy: 'buy now',
+  hold: 'hold or delay',
+  skip: 'skip',
+}
+
+const alignRationaleWithOutcome = (outcome: VerdictOutcome, rationale: string) => {
+  const trimmedRationale = rationale.trim()
+  const strippedRationale = trimmedRationale
+    .replace(/^(?:\s*outcome\s*:\s*[^.]+\.?\s*)+/i, '')
+    .replace(
+      /^(?:\s*(?:outcome\s*\+\s*primary reason|primary reason|recommendation)\s*[:\-]\s*)+/i,
+      ''
+    )
+    .replace(
+      /\boutcome\s*:\s*(?:buy(?:\s+now)?|hold(?:\s+or\s+delay)?|skip|approve(?:\s+the\s+purchase)?)\.?\s*/gi,
+      ''
+    )
+    .trim()
+  const body = strippedRationale.length > 0 ? strippedRationale : trimmedRationale
+  return `Outcome: ${OUTCOME_RATIONALE_LABEL[outcome]}. ${body}`.trim()
+}
+
+const hasAnyToken = (text: string, tokens: string[]) => {
+  return tokens.some((token) => text.includes(token))
+}
+
+const hasPriceToleranceLanguage = (text: string) => {
+  const tolerancePatterns = [
+    /price.{0,24}(tolerable|acceptable|reasonable|justified)/,
+    /(premium|luxury).{0,24}(acceptable|reasonable|justified|warranted)/,
+    /(worth|justified).{0,24}(higher price|higher cost|premium)/,
+    /not (a|the) dealbreaker/,
+    /not (by itself|by themselves)/,
+    /(despite|even with).{0,24}(high price|premium|luxury)/,
+  ]
+  return tolerancePatterns.some((pattern) => pattern.test(text))
+}
+
+const hasPromptTemplateLeak = (text: unknown) => {
+  if (typeof text !== 'string') {
+    return true
+  }
+
+  const normalized = text.toLowerCase()
+  const leakMarkers = [
+    '<write a personalized',
+    'critical: do not just list facts',
+    'structure:',
+    'outcome + primary reason',
+    'use a warm, conversational tone',
+    'example: we',
+    '<2-3 sentences offering an alternative',
+  ]
+  return leakMarkers.some((marker) => normalized.includes(marker))
+}
+
+const isEssentialImportantHighUtilityPurchase = (
+  input: PurchaseInput,
+  llmResponse: LLMEvaluationResponse,
+  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null
+) => {
+  if (!input.isImportant) {
+    return false
+  }
+
+  const justification = (input.justification ?? '').toLowerCase()
+  const hasEssentialSignal = hasAnyToken(justification, [
+    'essential',
+    'for work',
+    'required',
+    'need',
+    'photo',
+    'video',
+    'editing',
+    'machine learning',
+    'ml',
+  ])
+  const hasStrongLongTermUtility =
+    typeof llmResponse.long_term_utility?.score === 'number' &&
+    llmResponse.long_term_utility.score >= 0.65
+  const hasHighPriceOrPremiumTier =
+    (typeof input.price === 'number' && input.price >= 200) ||
+    vendorPriceTier === 'premium' ||
+    vendorPriceTier === 'luxury'
+
+  return hasEssentialSignal && hasStrongLongTermUtility && hasHighPriceOrPremiumTier
+}
+
+const validateImportantPurchaseLlmOnlyRationale = (
+  input: PurchaseInput,
+  llmResponse: LLMEvaluationResponse,
+  vendorPriceTier: 'budget' | 'mid_range' | 'premium' | 'luxury' | null
+): { isValid: boolean; reason?: string } => {
+  if (!input.isImportant) {
+    return { isValid: true }
+  }
+
+  const rationale =
+    (typeof llmResponse.rationale === 'string' ? llmResponse.rationale : '')
+      .toLowerCase()
+      .trim()
+  if (!rationale) {
+    return { isValid: false, reason: 'Missing rationale for important purchase.' }
+  }
+
+  const mentionsImportantPurchase =
+    /\bimportant purchase\b/.test(rationale) ||
+    /\bis important\b/.test(rationale) ||
+    /\bhigh[-\s]?priority\b/.test(rationale) ||
+    /\bpriority purchase\b/.test(rationale)
+  if (!mentionsImportantPurchase) {
+    return {
+      isValid: false,
+      reason: 'Rationale must explicitly acknowledge this is an important purchase.',
+    }
+  }
+
+  const mentionsPriceTolerance = hasPriceToleranceLanguage(rationale)
+  if (!mentionsPriceTolerance) {
+    return {
+      isValid: false,
+      reason:
+        'Rationale must explicitly state that high price/premium tier is tolerated for important purchases.',
+    }
+  }
+
+  const flagsHighPriceAsPrimaryNegative =
+    /(primary|primarily|mainly|chief|key|main|biggest concern|primary concern|main reason).{0,40}(high price|expensive|premium|luxury|cost|overpriced|price point)/.test(rationale) ||
+    /(high price|expensive|premium|luxury|cost|overpriced|price point).{0,40}(primary|primarily|mainly|chief|key|main|biggest concern|primary concern|main reason)/.test(rationale)
+  if (!flagsHighPriceAsPrimaryNegative) {
+    return { isValid: true }
+  }
+
+  const hasAffordabilityEvidence = hasAnyToken(rationale, [
+    'financial strain',
+    'over budget',
+    'cannot afford',
+    "can't afford",
+    'affordability concern',
+    'strain on affordability',
+    'weekly fun budget',
+  ])
+  const hasLongTermUtilityEvidence = hasAnyToken(rationale, [
+    'long-term utility',
+    'long term utility',
+    'low utility',
+    'unlikely to use',
+    "didn't get used",
+    'poor durability',
+  ])
+
+  if (!hasAffordabilityEvidence && !hasLongTermUtilityEvidence) {
+    return {
+      isValid: false,
+      reason:
+        'Rationale treats high price/premium tier as the primary negative reason without affordability strain or low long-term utility evidence.',
+    }
+  }
+
+  if (
+    llmResponse.verdict === 'skip' &&
+    isEssentialImportantHighUtilityPurchase(input, llmResponse, vendorPriceTier)
+  ) {
+    return {
+      isValid: false,
+      reason:
+        "Important essential purchases with strong long-term utility and high price/premium tier must not return a 'skip' verdict.",
+    }
+  }
+
+  return { isValid: true }
+}
+
 const computePsychScores = (answers?: OnboardingAnswers | null) => {
   if (!answers) {
     return { neuroticism: 0, materialism: 0, locusOfControl: 0 }
@@ -230,6 +404,10 @@ export async function regenerateVerdict(
   verdict: VerdictRow,
   openaiApiKey?: string
 ): Promise<{ data: VerdictRow | null; error: string | null }> {
+  if (!openaiApiKey) {
+    return { data: null, error: 'Regenerate requires a configured OpenAI API key.' }
+  }
+
   const reasoning = verdict.reasoning as { importantPurchase?: boolean } | null
   const input: PurchaseInput = {
     title: verdict.candidate_title,
@@ -241,7 +419,9 @@ export async function regenerateVerdict(
   }
 
   const algorithm = verdict.scoring_model ?? 'standard'
-  const evaluation = await evaluatePurchase(userId, input, openaiApiKey, algorithm)
+  const evaluation = await evaluatePurchase(userId, input, openaiApiKey, algorithm, {
+    isRegeneration: true,
+  })
   const vendorMatch = await retrieveVendorMatch(input)
   const holdReleaseAt =
     evaluation.outcome === 'hold'
@@ -285,7 +465,10 @@ export async function evaluatePurchase(
   userId: string,
   input: PurchaseInput,
   openaiApiKey?: string,
-  algorithm: VerdictAlgorithm = 'standard'
+  algorithm: VerdictAlgorithm = 'standard',
+  regeneration?: {
+    isRegeneration: boolean
+  }
 ): Promise<EvaluationResult> {
   const vendorMatch = await retrieveVendorMatch(input)
   const { data: profile } = await supabase
@@ -351,36 +534,102 @@ export async function evaluatePurchase(
       vendorMatch,
       algorithm
     )
+    const maxAttempts =
+      regeneration?.isRegeneration || (algorithm === 'llm_only' && input.isImportant) ? 2 : 1
+    let retryReason = ''
+    let llmResponse: LLMEvaluationResponse | null = null
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-nano',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 500,
-      }),
-    })
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const importantPurchaseRetryInstruction =
+        algorithm === 'llm_only' && input.isImportant
+          ? `\nFor important purchases and essential items, high price/premium tier is tolerated unless there is poor long-term utility evidence.
+          If it is a high price/premium tier purchase with long-term utility and essential, approve the purchase regardless of value conflicts and high upfront cost,
+          add a suggestion for financing options, but never return a 'skip' verdict.`
+          : ''
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`)
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-nano',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `${userPrompt}${importantPurchaseRetryInstruction}`,
+            },
+          ],
+          max_completion_tokens: 4000,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.text()
+        throw new Error(`OpenAI API error: ${response.status} - ${errorBody}`)
+      }
+
+      const data = await response.json()
+      const message = data.choices?.[0]?.message
+      const content = message?.content
+      const finishReason = data.choices?.[0]?.finish_reason
+
+      if (typeof content !== 'string' || content.trim().length === 0) {
+        retryReason =
+          finishReason === 'length'
+            ? 'Model hit token limit before returning content.'
+            : 'No content in LLM response.'
+        if (attempt < maxAttempts) {
+          continue
+        }
+        throw new Error(retryReason)
+      }
+
+      let candidateResponse: LLMEvaluationResponse
+      try {
+        candidateResponse = JSON.parse(content.trim()) as LLMEvaluationResponse
+      } catch {
+        retryReason = 'Response was not valid JSON.'
+        if (attempt < maxAttempts) {
+          continue
+        }
+        throw new Error('Invalid JSON in LLM response')
+      }
+
+      const leakedRationale = hasPromptTemplateLeak(candidateResponse.rationale)
+      const leakedAlternative = hasPromptTemplateLeak(candidateResponse.alternative_solution)
+      if (leakedRationale || leakedAlternative) {
+        retryReason = 'Response included leaked prompt template text.'
+        if (attempt < maxAttempts) {
+          continue
+        }
+        throw new Error('LLM response contained prompt template text.')
+      }
+
+      if (algorithm === 'llm_only' && input.isImportant) {
+        const validation = validateImportantPurchaseLlmOnlyRationale(
+          input,
+          candidateResponse,
+          vendorMatch?.vendor_price_tier ?? null
+        )
+        if (!validation.isValid) {
+          retryReason = validation.reason ?? 'Policy validation failed.'
+          if (attempt < maxAttempts) {
+            continue
+          }
+          throw new Error(`LLM-only policy violation: ${retryReason}`)
+        }
+      }
+
+      llmResponse = candidateResponse
+      break
     }
 
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
-
-    if (!content) {
-      throw new Error('No content in LLM response')
+    if (!llmResponse) {
+      throw new Error('No valid LLM response after policy validation.')
     }
-
-    const llmResponse = JSON.parse(content) as LLMEvaluationResponse
 
     const valueConflict = buildScore(
       llmResponse.value_conflict.score,
@@ -407,27 +656,42 @@ export async function evaluatePurchase(
       llmResponse.long_term_regret.explanation
     )
 
+    if (
+      !isVerdictOutcome(llmResponse.verdict) ||
+      typeof llmResponse.confidence !== 'number' ||
+      !Number.isFinite(llmResponse.confidence)
+    ) {
+      return evaluatePurchaseFallback(input, {
+        patternRepetition,
+        financialStrain,
+        vendorMatch,
+        profileContextSummary: profileContext,
+        similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
+        recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
+        psychScores,
+        algorithm: getFallbackAlgorithm(algorithm),
+      })
+    }
+
     if (algorithm === 'llm_only') {
-      if (
-        !isVerdictOutcome(llmResponse.verdict) ||
-        typeof llmResponse.confidence !== 'number' ||
-        !Number.isFinite(llmResponse.confidence)
-      ) {
-        return evaluatePurchaseFallback(input, {
-          patternRepetition,
-          financialStrain,
-          vendorMatch,
-          profileContextSummary: profileContext,
-          similarPurchasesSummary: `${similarRecentPurchases}\n${similarLongTermPurchases}`,
-          recentPurchasesSummary: `${recentRatedPurchases}\n${longTermRatedPurchases}`,
-          psychScores,
-          algorithm: 'standard',
-        })
-      }
+      const shouldForceApprove =
+        llmResponse.verdict === 'skip' &&
+        isEssentialImportantHighUtilityPurchase(
+          input,
+          llmResponse,
+          vendorMatch?.vendor_price_tier ?? null
+        )
+      const llmOnlyVerdict: VerdictOutcome = shouldForceApprove ? 'buy' : llmResponse.verdict
+      const llmOnlyConfidence = shouldForceApprove
+        ? clamp01(Math.max(llmResponse.confidence, 0.65))
+        : clamp01(llmResponse.confidence)
+      const llmOnlyRationale = shouldForceApprove
+        ? `${llmResponse.rationale} This is treated as an essential important purchase with strong long-term utility, so never return a skip outcome. Add a suggestion for financing options.`
+        : llmResponse.rationale
 
       return {
-        outcome: llmResponse.verdict,
-        confidence: clamp01(llmResponse.confidence),
+        outcome: llmOnlyVerdict,
+        confidence: llmOnlyConfidence,
         reasoning: {
           valueConflict,
           patternRepetition,
@@ -438,7 +702,7 @@ export async function evaluatePurchase(
           shortTermRegret,
           longTermRegret,
           alternativeSolution: llmResponse.alternative_solution,
-          rationale: llmResponse.rationale,
+          rationale: alignRationaleWithOutcome(llmOnlyVerdict, llmOnlyRationale),
           importantPurchase: input.isImportant,
           algorithm,
         },
@@ -456,10 +720,12 @@ export async function evaluatePurchase(
       materialism: psychScores.materialism,
       locusOfControl: psychScores.locusOfControl,
     })
+    const finalOutcome = llmResponse.verdict
+    const finalConfidence = clamp01(llmResponse.confidence)
 
     return {
-      outcome: decisionResult.outcome,
-      confidence: decisionResult.confidence,
+      outcome: finalOutcome,
+      confidence: finalConfidence,
       reasoning: {
         valueConflict,
         patternRepetition,
@@ -471,7 +737,7 @@ export async function evaluatePurchase(
         longTermRegret,
         alternativeSolution: llmResponse.alternative_solution,
         decisionScore: decisionResult.decisionScore,
-        rationale: llmResponse.rationale,
+        rationale: alignRationaleWithOutcome(finalOutcome, llmResponse.rationale),
         importantPurchase: input.isImportant,
         algorithm,
       },

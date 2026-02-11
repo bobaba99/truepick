@@ -53,16 +53,9 @@ export const buildUserPrompt = (
   vendorMatch: VendorMatch | null,
   algorithm: VerdictAlgorithm
 ) => {
-  const llmOnlyFields =
-    algorithm === 'llm_only'
-      ? `  "verdict": "<one of: buy, hold, skip>",
-  "confidence": <number 0-1, how confident you are in this recommendation>,
-`
-      : ''
-
   const llmOnlyInstruction =
     algorithm === 'llm_only'
-      ? '\nFor this request, use your own judgment to set the final verdict and confidence directly.'
+      ? '\nFor this request, use your own judgment to set the final verdict and confidence directly.\nCritical policy for LLM-only mode: when Important purchase is "Yes", high price points (including >$200) and premium/luxury vendor tiers are tolerated and must not be used as the primary negative reason by themselves.\nOnly treat price as negative for Important purchases when there is clear evidence of affordability strain or poor long-term utility.\nWhen Important purchase is "Yes", explicitly mention this tolerance policy in the rationale.'
       : ''
 
   return `${profileContext}
@@ -84,6 +77,9 @@ Now evaluate this purchase:
 - Vendor: ${input.vendor ?? 'Not specified'}
 - User rationale: "${input.justification ?? 'No rationale provided'}"
 - Important purchase: ${input.isImportant ? 'Yes' : 'No'}
+If it is an important purchase, treat it as an essential item and high price/premium tier is tolerated unless there is poor long-term utility evidence.
+If it is a high price/premium tier purchase with long-term utility and essential, approve the purchase regardless of value conflicts and high upfront cost,
+add a suggestion for financiing options, but never return a 'skip' verdict.
 ${llmOnlyInstruction}
 
 Output the final verdict and scoring in this exact JSON format:
@@ -112,8 +108,9 @@ Output the final verdict and scoring in this exact JSON format:
     "score": <number 0-1>,
     "explanation": "<brief explanation of long-term regret risk, be friendly and neutral>"
   },
-${llmOnlyFields}
+  "verdict": "<one of: buy, hold, skip>",
+  "confidence": <number 0-1, how confident you are in this recommendation>,
   "alternative_solution": "<2-3 sentences offering an alternative way to meet the same need if the verdict is hold/skip>",
-  "rationale": "<Write a personalized 3-4 sentence narrative explaining the recommendation. CRITICAL: Do not just list facts. Connect the evidence (price, vendor, history) directly to the decision. Example: 'We recommend holding because [Reason], which conflicts with your value of [Value].' Structure: (1) Outcome + Primary Reason. (2) Connection to User Profile/Values (quote values in <em> tags). (3) Supporting evidence from history/vendor. Use a warm, conversational tone.>"
+  "rationale": "<Write a personalized 3-4 sentence narrative explaining the recommendation. CRITICAL: Do not just list facts. Connect the evidence (price, vendor, history) directly to the decision. Example: 'We recommend holding because [Reason], which conflicts with your value of [Value].' Structure: (1) recommendation and main reason, (2) connection to user profile/values (quote values in <em> tags), (3) supporting evidence from history/vendor. Do not output section headers or labels in this field. Use a warm, conversational tone.>"
 }`
 }

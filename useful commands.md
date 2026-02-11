@@ -29,6 +29,9 @@ For example:
 `git worktree add ../nopamine-resources feat/resources-page`
 `git worktree add ../nopamine-seo feat/resources-page-seo-optimization`
 
+Run API server in `apps/api`:
+`npm --workspace apps/api run dev`
+
 Run `npm run dev` in the respective paths to start the development servers.
 `npm run dev -- --port 3001`
 `npm run dev -- --port 3002`
@@ -42,3 +45,9 @@ Merge later:
 Clean up work trees:
 `git worktree remove ../nopamine-email`
 `git branch -d feat/purchase-email-import-flow`
+
+# Pulling changes from main branch on work trees
+`git fetch origin`
+`git stash`
+`git merge main`
+`git stash pop`

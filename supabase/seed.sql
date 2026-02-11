@@ -41,20 +41,38 @@ begin
       target_email,
       true,
       'Focused on financial stability and durability, cautious about impulse buys.',
-      120.00,
+      200.00,
       jsonb_build_object(
-        'coreValues', jsonb_build_array('Financial stability', 'Minimalism / low clutter'),
-        'regretPatterns', jsonb_build_array('I bought impulsively'),
-        'satisfactionPatterns', jsonb_build_array('Lasts a long time'),
+        'coreValues', jsonb_build_array(
+          'Financial stability',
+          'Minimalism / low clutter',
+          'Emotional wellbeing',
+          'Self-improvement',
+          'Aesthetic enjoyment',
+          'Convenience'
+        ),
+        'regretPatterns', jsonb_build_array(
+          'It didn''t get used',
+          'It was too expensive for what it gave',
+          'It was driven by stress, boredom, or FOMO',
+          'It duplicated something I already had'
+        ),
+        'satisfactionPatterns', jsonb_build_array(
+          'Lasts a long time',
+          'Improves my daily routine',
+          'Supports my growth or habits',
+          'Saves time or energy',
+          'Makes life calmer or easier'
+        ),
         'decisionStyle', 'I plan carefully and delay',
-        'neuroticismScore', 4,
+        'neuroticismScore', 3,
         'materialism', jsonb_build_object(
           'centrality', 2,
           'happiness', 2,
           'success', 1
         ),
         'locusOfControl', jsonb_build_object(
-          'workHard', 5,
+          'workHard', 4,
           'destiny', 2
         ),
         'identityStability', 'Somewhat important'

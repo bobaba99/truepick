@@ -15,7 +15,12 @@ import {
   createUserProfile,
   updateUserProfile,
 } from '../api/userProfileService'
-import { getVerdictHistory, updateVerdictDecision, deleteVerdict } from '../api/verdictService'
+import {
+  getVerdictHistory,
+  updateVerdictDecision,
+  deleteVerdict,
+  regenerateVerdict,
+} from '../api/verdictService'
 import {
   getPurchaseHistory,
   createPurchase,
@@ -154,6 +159,7 @@ export default function Profile({ session }: ProfileProps) {
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [purchaseModalMode, setPurchaseModalMode] = useState<'add' | 'edit'>('add')
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
+  const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
   const [profileSummary, setProfileSummary] = useState('')
   const [weeklyFunBudget, setWeeklyFunBudget] = useState('')
@@ -176,6 +182,8 @@ export default function Profile({ session }: ProfileProps) {
   const [purchaseFilters, setPurchaseFilters] = useState<FilterState>(INITIAL_FILTERS)
   const [verdictFiltersOpen, setVerdictFiltersOpen] = useState(false)
   const [purchaseFiltersOpen, setPurchaseFiltersOpen] = useState(false)
+  const regenerateLockMessage =
+    'Another verdict is currently being regenerated. Please wait for it to finish.'
 
   const matchesSearch = (text: string, query: string) =>
     text.toLowerCase().includes(query.toLowerCase())
@@ -517,6 +525,42 @@ export default function Profile({ session }: ProfileProps) {
     setVerdictSavingId(null)
   }
 
+  const handleVerdictRegenerate = async (verdict: VerdictRow) => {
+    if (!session) return
+    if (verdictRegeneratingId) {
+      window.alert(regenerateLockMessage)
+      return
+    }
+
+    setVerdictRegeneratingId(verdict.id)
+    setStatus('')
+
+    try {
+      const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined
+      const { data, error } = await regenerateVerdict(session.user.id, verdict, openaiApiKey)
+
+      if (error || !data) {
+        setStatus(error ?? 'Failed to regenerate verdict.')
+        return
+      }
+
+      setVerdicts((previousVerdicts) =>
+        previousVerdicts.map((previousVerdict) =>
+          previousVerdict.id === data.id ? data : previousVerdict
+        )
+      )
+      if (selectedVerdict?.id === data.id) {
+        setSelectedVerdict(data)
+      }
+    } catch {
+      setStatus('Failed to regenerate verdict.')
+    } finally {
+      setVerdictRegeneratingId((currentVerdictId) =>
+        currentVerdictId === verdict.id ? null : currentVerdictId
+      )
+    }
+  }
+
   return (
     <section className="route-content">
       <h1>Profile</h1>
@@ -723,6 +767,8 @@ export default function Profile({ session }: ProfileProps) {
             <div className="verdict-list">
               {filteredVerdicts.map((verdict) => {
                 const isSaving = verdictSavingId === verdict.id
+                const isRegenerating = verdictRegeneratingId === verdict.id
+                const isBusy = isSaving || isRegenerating
                 return (
                   <GlassCard key={verdict.id} className="verdict-card">
                     <div
@@ -760,9 +806,17 @@ export default function Profile({ session }: ProfileProps) {
                       <div className="decision-buttons">
                         <LiquidButton
                           type="button"
+                          className="link"
+                          onClick={() => handleVerdictRegenerate(verdict)}
+                          disabled={verdictRegeneratingId !== null || isBusy}
+                        >
+                          {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+                        </LiquidButton>
+                        <LiquidButton
+                          type="button"
                           className={`decision-btn bought ${verdict.user_decision === 'bought' ? 'active' : ''}`}
                           onClick={() => handleVerdictDecision(verdict.id, 'bought')}
-                          disabled={isSaving}
+                          disabled={isBusy}
                         >
                           Bought
                         </LiquidButton>
@@ -770,7 +824,7 @@ export default function Profile({ session }: ProfileProps) {
                           type="button"
                           className={`decision-btn hold ${verdict.user_decision === 'hold' ? 'active' : ''}`}
                           onClick={() => handleVerdictDecision(verdict.id, 'hold')}
-                          disabled={isSaving}
+                          disabled={isBusy}
                         >
                           Hold 24h
                         </LiquidButton>
@@ -778,7 +832,7 @@ export default function Profile({ session }: ProfileProps) {
                           type="button"
                           className={`decision-btn skip ${verdict.user_decision === 'skip' ? 'active' : ''}`}
                           onClick={() => handleVerdictDecision(verdict.id, 'skip')}
-                          disabled={isSaving}
+                          disabled={isBusy}
                         >
                           Skip
                         </LiquidButton>
@@ -787,7 +841,7 @@ export default function Profile({ session }: ProfileProps) {
                         type="button"
                         className="link danger"
                         onClick={() => handleVerdictDelete(verdict.id)}
-                        disabled={isSaving}
+                        disabled={isBusy}
                       >
                         Delete
                       </LiquidButton>
@@ -889,6 +943,8 @@ export default function Profile({ session }: ProfileProps) {
           verdict={selectedVerdict}
           isOpen={selectedVerdict !== null}
           onClose={() => setSelectedVerdict(null)}
+          onRegenerate={handleVerdictRegenerate}
+          isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />,
         document.body
       )}
