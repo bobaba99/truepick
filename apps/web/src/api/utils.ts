@@ -42,3 +42,35 @@ export const cosineSimilarity = (a: number[], b: number[]) => {
   if (normA === 0 || normB === 0) return 0
   return dot / (Math.sqrt(normA) * Math.sqrt(normB))
 }
+
+// Average adult reading speed (source: Medium.com reading time standard)
+const WORDS_PER_MINUTE = 200
+
+/**
+ * Strips HTML tags from a string using regex
+ * @param html - HTML string to strip
+ * @returns Plain text without HTML tags
+ */
+const stripHtml = (html: string): string => {
+  return html.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ')
+}
+
+/**
+ * Calculates estimated reading time based on word count
+ * @param title - Article title
+ * @param summary - Article summary
+ * @param bodyMarkdown - Article body in markdown format
+ * @returns Estimated reading time in minutes (minimum 1 minute)
+ */
+export const calculateReadingTime = (
+  title: string,
+  summary: string,
+  bodyMarkdown: string
+): number => {
+  const text = `${title} ${summary} ${stripHtml(bodyMarkdown)}`
+  const wordCount = text
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0).length
+  return Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE))
+}

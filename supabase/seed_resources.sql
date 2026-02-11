@@ -6,7 +6,6 @@ INSERT INTO resources (
   title,
   summary,
   body_markdown,
-  category,
   tags,
   reading_time_minutes,
   canonical_url,
@@ -35,8 +34,7 @@ INSERT INTO resources (
 </ul>
 
 <p>Ultimately, impulse buying is a manifestation of an evolutionary survival mechanism—designed for resource scarcity—operating within a modern environment of artificial abundance. When the stimulus is removed, the dopaminergic "pulse" fades, and the individual is left to reconcile the behavior with their broader self-concept.</p>',
-  'Psychology',
-  ARRAY['neuroscience', 'dopamine', 'behavioral-economics'],
+  ARRAY['neuroscience', 'dopamine', 'behavioral-economics', 'psychology'],
   8,
   NULL,
   NULL,
@@ -65,8 +63,7 @@ INSERT INTO resources (
 </ul>
 
 <p>The magnitude of this dissonance is proportional to the <strong>irrevocability of the decision</strong>. In an era of easy returns, dissonance is often deferred, but in high-stakes or non-refundable contexts, it can lead to significant psychological stress and a permanent shift in future consumption patterns.</p>',
-  'Psychology',
-  ARRAY['cognitive-dissonance', 'consumer-behavior', 'regret'],
+  ARRAY['cognitive-dissonance', 'consumer-behavior', 'regret', 'psychology'],
   7,
   NULL,
   NULL,
@@ -95,8 +92,7 @@ INSERT INTO resources (
 </ul>
 
 <p>The integration of <strong>interstitial triggers</strong>—pop-ups that appear during moments of high engagement—effectively disrupts the consumer''s evaluative process. By the time the user reaches the confirmation page, the "sunk cost" of time and effort already invested often compels them to finalize the purchase, even if the initial intent was merely passive browsing. This represents a systematic exploitation of human behavioral vulnerabilities.</p>',
-  'Finance',
-  ARRAY['choice-architecture', 'nudge-theory', 'UX-design'],
+  ARRAY['choice-architecture', 'nudge-theory', 'UX-design', 'finance'],
   6,
   NULL,
   NULL,
@@ -125,8 +121,7 @@ INSERT INTO resources (
 </ul>
 
 <p>This "halo" creates a temporary blind spot regarding the product''s actual necessity. Regret typically emerges once the halo effect diminishes—usually when the consumer interacts with the product in a utilitarian context and discovers that the peripheral aesthetic attributes do not compensate for core functional deficiencies or the resulting financial strain.</p>',
-  'Psychology',
-  ARRAY['halo-effect', 'cognitive-bias', 'marketing'],
+  ARRAY['halo-effect', 'cognitive-bias', 'marketing', 'psychology'],
   7,
   NULL,
   NULL,
@@ -155,8 +150,7 @@ INSERT INTO resources (
 </ul>
 
 <p>By forcing a transition from an affective state to a deliberative state, these contracts allow for a more accurate assessment of opportunity cost. When the gap between the "experiencing self" and the "planning self" is bridged, the probability of post-purchase dissonance is minimized, and financial decisions become anchored in sustained utility rather than transient neurochemical spikes.</p>',
-  'Finance',
-  ARRAY['behavioral-finance', 'self-regulation', 'pre-commitment'],
+  ARRAY['behavioral-finance', 'self-regulation', 'pre-commitment', 'finance'],
   8,
   NULL,
   NULL,

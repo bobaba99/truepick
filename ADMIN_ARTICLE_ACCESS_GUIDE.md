@@ -82,6 +82,8 @@ This creates 5 published articles covering:
 - The Halo Effect in product valuation
 - Pre-commitment mitigation strategies
 
+Each article includes relevant tags from the recommended list (e.g., `neuroscience`, `psychology`, `finance`, `behavioral-economics`).
+
 ## 5) Sign In as Admin
 
 1. Open the web app (`http://localhost:5173`).
@@ -110,8 +112,7 @@ In **Admin Article Editor**:
 | **Title** | The article headline displayed on the article page and in listings. |
 | **Summary** | A short description/teaser of the article. Shown in article cards and SEO meta descriptions. |
 | **Body content** | The main article content written in Markdown. Supports rich formatting (headings, lists, images, links, etc.). |
-| **Category** | Broad classification (e.g., "Finance", "Psychology"). Used for grouping/filtering articles. |
-| **Tags** | Array of keywords (e.g., `["budgeting", "saving"]`). Used for related content suggestions and search. |
+| **Tags** | Array of keywords selected from recommended list or custom added. Used for grouping, related content suggestions, and search. Click to select/deselect from dropdown or type to create new tags. |
 
 #### Recommended Fields
 

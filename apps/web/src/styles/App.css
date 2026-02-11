@@ -2291,3 +2291,138 @@
   margin-bottom: 0.4rem;
   display: block;
 }
+
+/* Tags multiselect component */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tags-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-700);
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  min-height: 44px;
+  position: relative;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-left: 0.25rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.tag-remove:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tag-input-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+}
+
+.tag-input {
+  width: 100%;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--ink-900);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.tag-input::placeholder {
+  color: var(--ink-600);
+}
+
+.tag-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  background: #1a1d24;
+  border: 1px solid var(--glass-border);
+  border-radius: 0.5rem;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.tag-option {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--ink-700);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tag-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-900);
+}
+
+.tag-option.create-new {
+  color: #60a5fa;
+  font-weight: 500;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.tag-option.selected {
+  color: #34d399;
+}
+
+.tag-section {
+  padding: 0.5rem 0;
+}
+
+.tag-section-title {
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-600);
+}

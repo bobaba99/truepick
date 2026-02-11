@@ -60,7 +60,6 @@ type ResourceUpsertBody = {
   title: string
   summary: string
   bodyMarkdown: string
-  category: string
   tags: string[]
   readingTimeMinutes: number | null
   canonicalUrl: string | null
@@ -76,7 +75,6 @@ const toDbRow = (row: Record<string, unknown>) => ({
   title: row.title,
   summary: row.summary,
   body_markdown: row.body_markdown,
-  category: row.category,
   tags: row.tags ?? [],
   reading_time_minutes: row.reading_time_minutes,
   canonical_url: row.canonical_url,
@@ -95,7 +93,7 @@ app.get('/health', (_req, res) => {
 app.get('/admin/resources', requireAdmin, async (_req, res) => {
   const { data, error } = await supabase()
     .from('resources')
-    .select('id, slug, title, summary, body_markdown, category, tags, reading_time_minutes, canonical_url, cover_image_url, cta_url, is_published, published_at, created_at, updated_at')
+    .select('id, slug, title, summary, body_markdown, tags, reading_time_minutes, canonical_url, cover_image_url, cta_url, is_published, published_at, created_at, updated_at')
     .order('updated_at', { ascending: false })
 
   if (error) {
