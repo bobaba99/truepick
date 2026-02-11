@@ -85,7 +85,6 @@ export default function Resources() {
                   </div>
                   <div className="verdict-meta">
                     <span>{resource.summary}</span>
-                    {resource.category && <span>Category: {resource.category}</span>}
                     {resource.reading_time_minutes && (
                       <span>Reading time: {resource.reading_time_minutes} min</span>
                     )}
