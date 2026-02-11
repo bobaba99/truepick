@@ -1,6 +1,13 @@
 import type { PurchaseInput, VerdictAlgorithm, VendorMatch } from './types'
 import { VENDOR_RUBRIC } from './verdictScoring'
 
+const LLM_ONLY_POLICY_INSTRUCTION =
+  '\nFor this request, use your own judgment to set the final verdict and confidence directly.\nCritical policy for LLM-only mode: when Important purchase is "Yes", high price points (including >$200) and premium/luxury vendor tiers are tolerated and must not be used as the primary negative reason by themselves.\nOnly treat price as negative for Important purchases when there is clear evidence of affordability strain or poor long-term utility.\nWhen Important purchase is "Yes", explicitly mention this tolerance policy in the rationale.'
+
+const IMPORTANT_PURCHASE_POLICY_INSTRUCTION = `If it is an important purchase, treat it as an essential item and high price/premium tier is tolerated unless there is poor long-term utility evidence.
+If it is a high price/premium tier purchase with long-term utility and essential, approve the purchase regardless of value conflicts and high upfront cost,
+add a suggestion for financiing options, but never return a 'skip' verdict.`
+
 export const buildSystemPrompt = () => {
   return `Role: You are a purchase evaluator. Your responsibility is to score purchase motivations and long-term utility against the user's profile and history.
 
@@ -53,10 +60,7 @@ export const buildUserPrompt = (
   vendorMatch: VendorMatch | null,
   algorithm: VerdictAlgorithm
 ) => {
-  const llmOnlyInstruction =
-    algorithm === 'llm_only'
-      ? '\nFor this request, use your own judgment to set the final verdict and confidence directly.\nCritical policy for LLM-only mode: when Important purchase is "Yes", high price points (including >$200) and premium/luxury vendor tiers are tolerated and must not be used as the primary negative reason by themselves.\nOnly treat price as negative for Important purchases when there is clear evidence of affordability strain or poor long-term utility.\nWhen Important purchase is "Yes", explicitly mention this tolerance policy in the rationale.'
-      : ''
+  const llmOnlyInstruction = algorithm === 'llm_only' ? LLM_ONLY_POLICY_INSTRUCTION : ''
 
   return `${profileContext}
 
@@ -77,9 +81,7 @@ Now evaluate this purchase:
 - Vendor: ${input.vendor ?? 'Not specified'}
 - User rationale: "${input.justification ?? 'No rationale provided'}"
 - Important purchase: ${input.isImportant ? 'Yes' : 'No'}
-If it is an important purchase, treat it as an essential item and high price/premium tier is tolerated unless there is poor long-term utility evidence.
-If it is a high price/premium tier purchase with long-term utility and essential, approve the purchase regardless of value conflicts and high upfront cost,
-add a suggestion for financiing options, but never return a 'skip' verdict.
+${IMPORTANT_PURCHASE_POLICY_INSTRUCTION}
 ${llmOnlyInstruction}
 
 Output the final verdict and scoring in this exact JSON format:
