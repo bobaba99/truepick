@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type {
   OnboardingAnswers,
@@ -148,6 +149,7 @@ const normalizeOnboardingAnswers = (
 }
 
 export default function Profile({ session }: ProfileProps) {
+  const navigate = useNavigate()
   const [, setUserRow] = useState<UserRow | null>(null)
   const [verdicts, setVerdicts] = useState<VerdictRow[]>([])
   const [purchases, setPurchases] = useState<PurchaseRow[]>([])
@@ -1434,16 +1436,19 @@ export default function Profile({ session }: ProfileProps) {
                   <button
                     type="button"
                     className="import-option-btn gmail"
-                    onClick={() => alert('Gmail API integration coming soon!')}
+                    onClick={() => {
+                      setEmailImportModalOpen(false)
+                      navigate('/email-sync')
+                    }}
                   >
                     <GmailLogo className="import-logo" />
                     <span className="import-label">Connect Gmail</span>
                   </button>
-                  
+
                   <button
                     type="button"
                     className="import-option-btn outlook"
-                    onClick={() => alert('Outlook API integration coming soon!')}
+                    onClick={() => alert('Outlook integration coming soon!')}
                   >
                     <OutlookLogo className="import-logo" />
                     <span className="import-label">Connect Outlook</span>

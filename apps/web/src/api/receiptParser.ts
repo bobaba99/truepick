@@ -1,6 +1,6 @@
 /**
  * Receipt Parser
- * Uses GPT-5-nano to extract structured purchase data from email content
+ * Uses GPT-4o-mini to extract structured purchase data from email content
  */
 
 import type { PurchaseCategory } from './types'
@@ -72,6 +72,7 @@ const VALID_CATEGORIES: PurchaseCategory[] = [
 /**
  * Parse receipt email content using GPT-4o-mini
  * Returns an array of extracted receipts (one per item in the email)
+ * @throws Error if API key is missing or API call fails
  */
 export async function parseReceiptWithAI(
   emailText: string,
@@ -90,6 +91,11 @@ export async function parseReceiptWithAI(
     .replace('{content}', truncatedContent)
 
   try {
+    // Validate API key before making request
+    if (!openaiApiKey || openaiApiKey.trim() === '') {
+      throw new Error('OpenAI API key is missing or empty')
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -100,13 +106,17 @@ export async function parseReceiptWithAI(
         model: 'gpt-5-nano',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0,
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     })
 
     if (!response.ok) {
       const error = await response.json()
-      throw new Error(error.error?.message ?? 'OpenAI API request failed')
+      const errorMessage = error.error?.message ?? 'OpenAI API request failed'
+      if (response.status === 401 || response.status === 400) {
+        throw new Error(`OpenAI authentication failed: ${errorMessage}. Check VITE_OPENAI_API_KEY.`)
+      }
+      throw new Error(errorMessage)
     }
 
     const data: OpenAIResponse = await response.json()

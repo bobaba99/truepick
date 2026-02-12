@@ -13,6 +13,22 @@ import {
 import { parseReceiptWithAI, type ExtractedReceipt } from './receiptParser'
 import { updateLastSync } from './emailConnectionService'
 import { supabase } from './supabaseClient'
+import {
+  startImportLog,
+  logImport,
+  logSkip,
+  logError,
+  logFilterReject,
+  endImportLog,
+  logFetchedMessage,
+  clearFetchedMessages,
+  downloadMessagesMarkdown,
+  previewMessagesMarkdown,
+  type ImportLogSummary,
+} from './log/importLogger'
+
+// Re-export markdown functions for UI access
+export { downloadMessagesMarkdown, previewMessagesMarkdown }
 
 export type ImportOptions = {
   maxMessages?: number
@@ -29,6 +45,7 @@ export type ImportResult = {
   imported: ImportedPurchase[]
   skipped: number
   errors: string[]
+  log?: ImportLogSummary
 }
 
 /**
@@ -45,6 +62,18 @@ export async function importGmailReceipts(
 ): Promise<ImportResult> {
   const { maxMessages = 10, sinceDays = 90, openaiApiKey } = options
 
+  // Validate required credentials
+  if (!accessToken) {
+    throw new Error('Gmail access token is required')
+  }
+  if (!openaiApiKey) {
+    throw new Error('OpenAI API key is required. Set VITE_OPENAI_API_KEY in .env')
+  }
+
+  // Start logging session
+  startImportLog()
+  clearFetchedMessages()
+
   const results: ImportedPurchase[] = []
   const errors: string[] = []
   let skipped = 0
@@ -53,10 +82,12 @@ export async function importGmailReceipts(
   const query = buildReceiptQuery(sinceDays)
 
   // List candidate messages (fetch more than needed for filtering)
-  const messageHeaders = await listMessages(accessToken, query, maxMessages * 3)
+  // TODO: optimize number of messages fetched
+  const messageHeaders = await listMessages(accessToken, query, maxMessages * 5)
 
   if (messageHeaders.length === 0) {
-    return { imported: [], skipped: 0, errors: [] }
+    const log = endImportLog()
+    return { imported: [], skipped: 0, errors: [], log }
   }
 
   // Process messages until we have enough receipts
@@ -71,8 +102,24 @@ export async function importGmailReceipts(
 
       // Multi-stage pre-filter: check if email looks like a receipt
       const filterResult = filterEmailForReceipt(parsed)
+
       if (!filterResult.shouldProcess) {
+        // Log rejected message for markdown export
+        logFetchedMessage({
+          emailId: header.id,
+          from: parsed.from,
+          subject: parsed.subject,
+          date: parsed.date,
+          textContent: parsed.textContent,
+          filterResult,
+        })
         skipped++
+        logFilterReject({
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          reason: filterResult.rejectionReason ?? 'unknown',
+          confidence: filterResult.confidence,
+        })
         continue
       }
 
@@ -85,8 +132,29 @@ export async function importGmailReceipts(
         openaiApiKey
       )
 
+      // Log fetched message with extracted receipts for markdown export
+      logFetchedMessage({
+        emailId: header.id,
+        from: parsed.from,
+        subject: parsed.subject,
+        date: parsed.date,
+        textContent: parsed.textContent,
+        filterResult,
+        extractedReceipts: receipts.map((r) => ({
+          title: r.title,
+          price: r.price,
+          vendor: r.vendor,
+          category: r.category,
+        })),
+      })
+
       if (receipts.length === 0) {
         skipped++
+        logSkip({
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          reason: 'llm_returned_empty',
+        })
         continue
       }
 
@@ -102,11 +170,30 @@ export async function importGmailReceipts(
           // Check if it's a duplicate (unique constraint violation)
           if (error.includes('duplicate') || error.includes('unique')) {
             skipped++
+            logSkip({
+              emailId: header.id,
+              emailSubject: parsed.subject,
+              reason: 'duplicate_order_id',
+            })
           } else {
             errors.push(`${receipt.title}: ${error}`)
+            logError({
+              emailId: header.id,
+              emailSubject: parsed.subject,
+              reason: error,
+            })
           }
           continue
         }
+
+        // Log successful import
+        logImport({
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          title: receipt.title,
+          price: receipt.price,
+          vendor: receipt.vendor,
+        })
 
         results.push({
           ...receipt,
@@ -124,13 +211,20 @@ export async function importGmailReceipts(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       errors.push(`Message ${header.id}: ${message}`)
+      logError({
+        emailId: header.id,
+        reason: message,
+      })
     }
   }
 
   // Update last sync timestamp
   await updateLastSync(userId)
 
-  return { imported: results, skipped, errors }
+  // End logging session and get summary
+  const log = endImportLog()
+
+  return { imported: results, skipped, errors, log }
 }
 
 /**

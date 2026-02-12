@@ -6,7 +6,7 @@ This document describes the verdict evaluation logic across `verdictContext.ts`,
 
 ## 1. Overview
 
-The verdict service evaluates potential purchases and returns a **Buy / Hold / Skip** verdict with reasoning. The active algorithm is **LLM-only** (`llm_only`): decisions come from OpenAI's GPT-5-nano. A heuristic fallback is used when the LLM is unavailable (no API key, parse failure, or validation failure).
+The verdict service evaluates potential purchases and returns a **Buy / Hold / Skip** verdict with reasoning. The active algorithm is **LLM-only** (`llm_only`): decisions come from OpenAI's GPT-4o-mini. A heuristic fallback is used when the LLM is unavailable (no API key, parse failure, or validation failure).
 
 **Entry points:**
 - `evaluatePurchase(userId, input, openaiApiKey?)` — runs evaluation (LLM or fallback)
@@ -249,7 +249,7 @@ If no budget: `high = 800`, `medium = 400`.
 
 ### 5.2 LLM Request
 
-- **Model:** `gpt-5-nano`
+- **Model:** `gpt-4o-mini`
 - **Messages:** `buildSystemPrompt()`, `buildUserPrompt(...)` + retry context
 - **max_completion_tokens:** 4000
 
@@ -398,7 +398,7 @@ Verdict persisted in `verdicts` table
 
 ## 9. External APIs
 
-| Service | Purpose |
-|---------|---------|
-| OpenAI Chat Completions | LLM verdict evaluation (gpt-5-nano) |
-| OpenAI Embeddings | Semantic similarity for similar purchases |
+| Service                  | Purpose                                   |
+|--------------------------|-------------------------------------------|
+| OpenAI Chat Completions  | LLM verdict evaluation (gpt-4o-mini)      |
+| OpenAI Embeddings        | Semantic similarity for similar purchases |

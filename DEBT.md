@@ -2,6 +2,8 @@
 
 - [ ] Add a loading bar during evaluation and regeneration, implement Claude-like words (e.g., fidgeting, coalescing)
 - [ ] Adapt for mobile web browswer size and layout
+- [ ] Add guiding questions for writing justification
+- [ ] Add warning modal dialog if the justification is too short
 
 `feat/about`
 

@@ -109,7 +109,7 @@ User clicks "Import Gmail"
   → Multi-stage filter pipeline (see 4.4.2)
   → Get message content (gmail.users.messages.get) for candidates
   → Clean HTML/strip noise
-  → GPT-5-nano extracts: {title, price, vendor, category, purchase_date}
+  → GPT-4o-mini extracts: {title, price, vendor, category, purchase_date}
   → Create purchases via purchaseService (source='email')
   → Update last_sync timestamp
 
