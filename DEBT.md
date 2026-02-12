@@ -7,6 +7,7 @@
 
 `feat/purchase-email-import-flow`
 
+- [ ] Reevaluate the strategy/architecture for filtering and parsing the emails (maybe consult Opus 4.6 before implementing)
 - [ ] Generate test email sets according to vendor data
 - [ ] Some emails are image-based instead of text-based, skipping lots of those ones
 
