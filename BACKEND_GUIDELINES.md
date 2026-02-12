@@ -24,7 +24,11 @@ apps/web/src/api/
 ├── statsService.ts
 ├── verdictService.ts
 ├── verdictContext.ts
-└── embeddingService.ts
+├── embeddingService.ts
+├── gmailClient.ts                 # Gmail REST API wrapper
+├── receiptParser.ts               # GPT-4o-mini receipt extraction
+├── emailConnectionService.ts      # OAuth token CRUD
+└── importGmail.ts                 # Gmail receipt import orchestration
 ```
 
 ---
@@ -53,6 +57,7 @@ apps/web/src/api/
 - `purchase_stats`
 - `verdicts`
 - `vendors`
+- `email_connections`
 
 **RPCs required by frontend services:**
 - `add_user_value`
@@ -61,6 +66,8 @@ apps/web/src/api/
 **External API calls from frontend today:**
 - `POST https://api.openai.com/v1/chat/completions`
 - `POST https://api.openai.com/v1/embeddings`
+- `GET https://gmail.googleapis.com/gmail/v1/users/me/messages` (Gmail list)
+- `GET https://gmail.googleapis.com/gmail/v1/users/me/messages/{id}` (Gmail get)
 
 ### 2.4 Service Return Patterns (Current)
 - Read flows: throw on Supabase error (e.g. `getUserProfile`, `getPurchaseHistory`)
@@ -176,6 +183,7 @@ Required for web runtime:
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_OPENAI_API_KEY=
+VITE_GOOGLE_CLIENT_ID=      # For Gmail OAuth
 ```
 
 Required for API scaffold:

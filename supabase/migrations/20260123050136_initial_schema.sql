@@ -526,7 +526,8 @@ create or replace function add_purchase(
   p_source text default 'manual',
   p_verdict_id uuid default null,
   p_is_past_purchase boolean default false,
-  p_past_purchase_outcome text default null
+  p_past_purchase_outcome text default null,
+  p_order_id text default null
 )
 returns purchases
 language plpgsql
@@ -550,7 +551,8 @@ begin
     source,
     verdict_id,
     is_past_purchase,
-    past_purchase_outcome
+    past_purchase_outcome,
+    order_id
   )
   values (
     auth.uid(),
@@ -562,7 +564,8 @@ begin
     p_source,
     p_verdict_id,
     p_is_past_purchase,
-    p_past_purchase_outcome
+    p_past_purchase_outcome,
+    nullif(p_order_id, '')
   )
   on conflict (verdict_id) where verdict_id is not null
   do update set
@@ -574,41 +577,34 @@ begin
   returning * into new_row;
 
   -- Determine scheduling logic based on purchase type
-  -- Past purchases: no swipe schedules needed (outcome stored directly)
-  if not p_is_past_purchase then
-    if p_source = 'verdict' and p_verdict_id is not null then
-      -- Get the user's decision from the verdict
-      select user_decision into v_user_decision
-      from verdicts
-      where id = p_verdict_id and user_id = auth.uid();
+  -- Past purchases (from email/ocr): single immediate swipe for behavior seeding
+  if p_is_past_purchase then
+    insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
+    values
+      (auth.uid(), new_row.id, 'immediate'::swipe_timing, new_row.purchase_date)
+    on conflict (user_id, purchase_id, timing) do nothing;
+  elsif p_source = 'verdict' and p_verdict_id is not null then
+    -- Get the user's decision from the verdict
+    select user_decision into v_user_decision
+    from verdicts
+    where id = p_verdict_id and user_id = auth.uid();
 
-      if v_user_decision = 'bought' then
-        -- Verdict purchase where user bought: schedule 3 follow-up swipes
-        insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
-        values
-          (auth.uid(), new_row.id, 'day3'::swipe_timing, new_row.purchase_date + interval '3 days'),
-          (auth.uid(), new_row.id, 'week3'::swipe_timing, new_row.purchase_date + interval '3 weeks'),
-          (auth.uid(), new_row.id, 'month3'::swipe_timing, new_row.purchase_date + interval '3 months')
-        on conflict (user_id, purchase_id, timing) do update
-          set scheduled_for = excluded.scheduled_for
-          where swipe_schedules.completed_at is null;
-      else
-        -- Verdict purchase where user skipped/held: single immediate swipe for "regret not buying"
-        insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
-        values
-          (auth.uid(), new_row.id, 'immediate'::swipe_timing, new_row.purchase_date)
-        on conflict (user_id, purchase_id, timing) do update
-          set scheduled_for = excluded.scheduled_for
-          where swipe_schedules.completed_at is null;
-      end if;
-    else
-      -- Non-verdict, non-past purchase (manual entry for recent purchase): single immediate swipe
+    if v_user_decision = 'bought' then
+      -- Verdict purchase where user bought: schedule 3 follow-up swipes
       insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
       values
-        (auth.uid(), new_row.id, 'immediate'::swipe_timing, new_row.purchase_date)
+        (auth.uid(), new_row.id, 'day3'::swipe_timing, new_row.purchase_date + interval '3 days'),
+        (auth.uid(), new_row.id, 'week3'::swipe_timing, new_row.purchase_date + interval '3 weeks'),
+        (auth.uid(), new_row.id, 'month3'::swipe_timing, new_row.purchase_date + interval '3 months')
       on conflict (user_id, purchase_id, timing) do update
         set scheduled_for = excluded.scheduled_for
         where swipe_schedules.completed_at is null;
+    else
+      -- Verdict purchase where user skipped/held: single immediate swipe for "regret not buying"
+      insert into swipe_schedules (user_id, purchase_id, timing, scheduled_for)
+      values
+        (auth.uid(), new_row.id, 'immediate'::swipe_timing, new_row.purchase_date)
+      on conflict (user_id, purchase_id, timing) do nothing;
     end if;
   end if;
 

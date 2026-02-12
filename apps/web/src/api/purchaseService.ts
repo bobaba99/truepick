@@ -26,6 +26,8 @@ export type CreatePurchaseInput = {
   category: string | null
   purchaseDate: string
   source?: string
+  orderId?: string | null
+  isPastPurchase?: boolean
 }
 
 export async function createPurchase(
@@ -38,6 +40,8 @@ export async function createPurchase(
     p_category: input.category,
     p_purchase_date: input.purchaseDate,
     p_source: input.source ?? 'manual',
+    p_order_id: input.orderId ?? null,
+    p_is_past_purchase: input.isPastPurchase ?? false,
   })
 
   return { error: error?.message ?? null }

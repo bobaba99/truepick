@@ -317,11 +317,12 @@ Updates `users`: `profile_summary`, `onboarding_answers`, `weekly_fun_budget` (c
 |-------|---------|------------|
 | `users` | evaluatePurchase, retrieveUserProfileContext, getUserProfile | createUserProfile, updateUserProfile, App (upsert) |
 | `verdicts` | getVerdictHistory, getRecentVerdict, updateVerdictDecision, getSwipeStats, submitVerdict | submitVerdict (insert/update), updateVerdictDecision, deleteVerdict, deletePurchase |
-| `purchases` | retrieveRecentPurchases, retrieveSimilarPurchases, computePatternRepetition, getPurchaseHistory, deletePurchase | createPurchase (RPC), updatePurchase, deletePurchase, updateVerdictDecision (RPC) |
+| `purchases` | retrieveRecentPurchases, retrieveSimilarPurchases, computePatternRepetition, getPurchaseHistory, deletePurchase, getEmailImportStats | createPurchase (RPC), updatePurchase, deletePurchase, updateVerdictDecision (RPC), importGmailReceipts (RPC) |
 | `swipes` | computePatternRepetition, getSwipeStats, retrieveRecentPurchases (joined) | createSwipe, deleteSwipe |
 | `swipe_schedules` | getUnratedPurchases | createSwipe (update), deleteSwipe (update) |
 | `vendors` | retrieveVendorMatch, submitVerdict | — |
 | `resources` | getPublishedResources | Admin API (apps/api) |
+| `email_connections` | getEmailConnection, getEmailImportStats, isTokenExpired | saveEmailConnection, updateLastSync, deactivateEmailConnection, deleteEmailConnection |
 
 ---
 
@@ -329,5 +330,71 @@ Updates `users`: `profile_summary`, `onboarding_answers`, `weekly_fun_budget` (c
 
 | API | Called by | Purpose |
 |-----|----------|---------|
-| OpenAI Chat Completions (`gpt-5-nano`) | `evaluatePurchase` | LLM verdict generation |
+| OpenAI Chat Completions (`gpt-4o-mini`) | `evaluatePurchase`, `parseReceiptWithAI` | LLM verdict generation, receipt data extraction |
 | OpenAI Embeddings | `retrieveSimilarPurchases` | Semantic similarity for purchase matching |
+| Gmail API (messages.list) | `listMessages` | Search for receipt emails |
+| Gmail API (messages.get) | `getMessage` | Fetch full email content |
+| Google OAuth | EmailSync page | Obtain Gmail access token |
+
+---
+
+## 11. Gmail Import Pipeline
+
+### 11.1 Core Functions
+
+#### `importGmailReceipts(accessToken, userId, options)`
+**File:** `importGmail.ts`
+**Purpose:** Orchestrates Gmail receipt import from OAuth token to purchase creation.
+
+| Step | Function Call | Source | External API |
+|------|---------------|--------|--------------|
+| 1 | `buildReceiptQuery(sinceDays)` | gmailClient | — |
+| 2 | `listMessages(accessToken, query, maxMessages * 3)` | gmailClient | Gmail API |
+| 3 | `getMessage(accessToken, messageId)` | gmailClient | Gmail API |
+| 4 | `parseMessage(message)` | gmailClient | — |
+| 5 | `looksLikeReceipt(parsed)` | gmailClient | — |
+| 6 | `parseReceiptWithAI(text, sender, subject, date, apiKey)` | receiptParser | OpenAI API |
+| 7 | `supabase.rpc('add_purchase', {...})` | direct | — |
+| 8 | `updateLastSync(userId)` | emailConnectionService | — |
+
+**Returns:** `ImportResult { imported, skipped, errors }`
+
+---
+
+#### `parseReceiptWithAI(emailText, sender, subject, emailDate, openaiApiKey)`
+**File:** `receiptParser.ts`
+**Purpose:** Uses GPT-4o-mini to extract structured purchase data from email content.
+
+| Step | Operation |
+|------|-----------|
+| 1 | Truncate email content to 4000 chars |
+| 2 | Build prompt with sender, subject, date, content |
+| 3 | Call OpenAI Chat Completions API |
+| 4 | Parse JSON response |
+| 5 | `validateAndNormalize(parsed, fallbackDate)` |
+
+**Returns:** `ExtractedReceipt | null`
+
+---
+
+### 11.2 Email Connection Service (emailConnectionService.ts)
+
+| Function | Operation | Table |
+|----------|-----------|-------|
+| `getEmailConnection(userId)` | SELECT | `email_connections` |
+| `saveEmailConnection(userId, input)` | UPSERT | `email_connections` |
+| `updateLastSync(userId)` | UPDATE | `email_connections.last_sync` |
+| `deactivateEmailConnection(userId)` | UPDATE | `email_connections.is_active = false` |
+| `deleteEmailConnection(userId)` | DELETE | `email_connections` |
+| `isTokenExpired(connection)` | — (pure function) | — |
+
+---
+
+### 11.3 Page → Service Call Map (EmailSync)
+
+| User Action | Service Calls (in order) |
+|-------------|--------------------------|
+| Page load | `getEmailConnection` → `getEmailImportStats` |
+| Connect Gmail | Google OAuth redirect → `saveEmailConnection` |
+| Import Receipts | `importGmailReceipts` → `getEmailImportStats` |
+| Disconnect | `deactivateEmailConnection` |

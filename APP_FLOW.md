@@ -78,6 +78,7 @@ The details include the product name, price, category, vendor, justification, an
 ```
 
 #### 4.1.1 Edge Cases
+
 - The user enters minimal justification for the purchase. If the length is less than 10 words, the app will show a modal dialog suggesting the user to write down more details with some probing questions to get a more accurate verdict. The dialog has a button to 'go back' and another button to 'continue' if the user wants to continue with missing details.
 - The justification also cannot be too long. If the length is greater than 100 words, the app will show a modal dialog suggesting the user to shorten the justification. The dialog has a button to 'go back' and another button to 'continue' if the user wants to continue with the long justification. This way to keep the token count in check.
 
@@ -99,9 +100,25 @@ The user can swipe for regret or satisfaction on the purchase. The app will upda
 [Dashboard] → [Swipe for Regret/Satisfaction] → [Purchase Stats Update]
 ```
 
-#### 4.2.1 Edge Cases
+### 4.4 Flow: Import receipts from Gmail
+
+User clicks "Import Gmail"
+  → OAuth flow (Google consent)
+  → Store encrypted tokens in email_connections
+  → Fetch recent 100 messages (gmail.users.messages.list)
+  → Filter by sender patterns (no-reply, receipts, etc.) for receipts and stops at 10 receipts
+  → Get message content (gmail.users.messages.get) for the 10 selected purchases
+  → Clean HTML/strip noise
+  → GPT-5-nano extracts: {title, price, vendor, category, purchase_date}
+  → Create purchases via purchaseService (source='email')
+  → Update last_sync timestamp
+
+#### 4.4.1 Edge Cases
 
 - The user doesn't swipe on past purchases. The app will remind the user to swipe on their past purchases to build their regret patterns for better verdict accuracy.
+- Token expiry: If the Gmail OAuth token expires, the user is prompted to reconnect Gmail.
+- No receipts found: If no receipt emails match the search patterns, display a helpful message.
+- Duplicate imports: Order ID deduplication prevents the same receipt from being imported twice.
 
 ---
 
@@ -152,7 +169,7 @@ The user can swipe for regret or satisfaction on the purchase. The app will upda
 | Registered User | Swipe for regret/satisfaction (including undo) | Registered User | ✅ done |
 | Registered User | View purchase stats | Registered User | ✅ done |
 | Registered User | View verdict history | Registered User | ✅ done |
-| Registered User | Import purchases from email | Registered User | ❌ not yet |
+| Registered User | Import purchases from email | Registered User | ✅ done |
 | Registered User | Logout | Guest User | ✅ done |
 
 ---
@@ -176,6 +193,8 @@ The user can swipe for regret or satisfaction on the purchase. The app will upda
 | Create swipe | Supabase Table | `insert swipes`, `update swipe_schedules.completed_at` | Regret/satisfied/not_sure | ✅ done |
 | Undo swipe | Supabase Table | `delete swipes`, `update swipe_schedules.completed_at = null` | 3s undo toast window | ✅ done |
 | Load dashboard stats | Supabase Table | `select swipes`, `select verdicts` (hold status) | Computes completed swipes, regret rate, active holds | ✅ done |
+| Connect Gmail | Google OAuth | `accounts.google.com/o/oauth2/v2/auth` | Implicit OAuth flow, stores token in `email_connections` | ✅ done |
+| Import Gmail receipts | Gmail API + OpenAI | `gmail.users.messages.list`, `gmail.users.messages.get`, GPT-4o-mini | Extracts purchase data from receipt emails | ✅ done |
 | Share verdict to social media or save as image | REST API | `POST /api/share` | Share endpoint not implemented in current scripts | ❌ not yet |
 | View educational content | REST API | `GET /api/educational-content` | No educational-content API route in current scripts | ❌ not yet |
 | View settings | REST API | `GET /api/settings` | No settings API route in current scripts | ❌ not yet |

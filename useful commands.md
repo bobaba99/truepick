@@ -53,3 +53,14 @@ Clean up work trees:
 `git stash`
 `git merge main`
 `git stash pop`
+
+# If I had to fix something while working on another branch
+`git stash .`
+`git checkout -b [hotfix]`
+`git stash pop` or `git stash apply stash@{0}` safer without deleting it like `pop`
+`git commit -m 'fix: `
+`git checkout main`
+`git merge fix: `
+`git push`
+`git checkout [original branch]`
+`git pull origin main`

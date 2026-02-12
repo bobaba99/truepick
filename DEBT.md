@@ -1,0 +1,33 @@
+`fix/[]`
+
+- [ ] Add a loading bar during evaluation and regeneration, implement Claude-like words (e.g., fidgeting, coalescing)
+- [ ] Adapt for mobile web browswer size and layout
+
+`feat/about`
+
+- [ ] Write content for about page
+- [ ] Update about page content
+
+`feat/support`
+
+- [ ] Write content for support page
+- [ ] Update support page content
+
+`feat/resource-page-seo-optimization`
+
+- [ ] research on SEO optimization
+- [ ] generate a SEO optimization rule/document
+- [ ] implement SEO optimization for preset documents
+
+`feat/settings-route-user-preferences`
+
+- [ ] Create modal dialog of user preferences
+- [ ] Generate a list of functions for user preferences
+- [ ] Implement the preference functions
+
+`feat/verdict-share-capability`
+
+- [ ] Design the verdict share card UI
+- [ ] Add the verdict share card generation as a modal dialog
+- [ ] Implement social media sharing handles
+- [ ] Implement image saving and sending to text message or email

@@ -398,7 +398,7 @@ function App() {
               <Route path="/faq" element={<FAQ />} />
               <Route path="/contact-us" element={<Contact />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/email-sync" element={<EmailSync />} />
+              <Route path="/email-sync" element={<EmailSync session={session} />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
             </Route>
