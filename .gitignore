@@ -42,3 +42,5 @@ build/
 # Logs
 *.log
 logs/
+apps/web/src/api/log/messages.original/
+apps/web/src/api/log/messages.raw.json
