@@ -1,5 +1,5 @@
-import type { ResourceRow, ResourceUpsertInput } from './types'
-import { calculateReadingTime } from './utils'
+import type { ResourceRow, ResourceUpsertInput } from '../core/types'
+import { calculateReadingTime } from '../core/utils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
 

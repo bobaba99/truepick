@@ -1,6 +1,6 @@
-import type { PurchaseInput, VendorMatch } from './types'
+import type { PurchaseInput, VendorMatch } from '../core/types'
 import { VENDOR_RUBRIC } from './verdictScoring'
-import { computePriceThresholds } from './utils'
+import { computePriceThresholds } from '../core/utils'
 
 export const buildSystemPrompt = () => {
   return `Role: You are a purchase evaluator. Your responsibility is to score purchase motivations and long-term utility against the user's profile and history.

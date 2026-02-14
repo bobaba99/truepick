@@ -3,7 +3,7 @@
  * CRUD operations for email_connections table (Gmail/Outlook OAuth tokens)
  */
 
-import { supabase } from './supabaseClient'
+import { supabase } from '../core/supabaseClient'
 
 export type EmailProvider = 'gmail' | 'outlook'
 

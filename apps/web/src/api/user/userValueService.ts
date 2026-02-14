@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { UserValueRow } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { UserValueRow } from '../core/types'
 
 export async function getUserValues(userId: string): Promise<UserValueRow[]> {
   const { data, error } = await supabase

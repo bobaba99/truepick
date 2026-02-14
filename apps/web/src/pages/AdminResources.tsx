@@ -11,8 +11,8 @@ import {
   unpublishAdminResource,
   updateAdminResource,
   uploadAdminResourceImage,
-} from '../api/adminResourceService'
-import type { ResourceRow, ResourceUpsertInput } from '../api/types'
+} from '../api/resource/adminResourceService'
+import type { ResourceRow, ResourceUpsertInput } from '../api/core/types'
 import { RECOMMENDED_TAGS } from '../constants/resourceTags'
 import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
 

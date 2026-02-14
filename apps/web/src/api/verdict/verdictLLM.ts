@@ -1,11 +1,11 @@
-import { logger } from './logger'
+import { logger } from '../core/logger'
 import type {
   EvaluationResult,
   LLMEvaluationResponse,
   PurchaseInput,
   VerdictOutcome,
-} from './types'
-import { clamp01 } from './utils'
+} from '../core/types'
+import { clamp01 } from '../core/utils'
 import {
   hasPromptTemplateLeak,
   isEssentialImportantHighUtilityPurchase,
@@ -14,7 +14,7 @@ import {
 } from './verdictValidation'
 import { buildSystemPrompt, buildUserPrompt } from './verdictPrompts'
 import { buildScore, evaluatePurchaseFallback } from './verdictScoring'
-import type { VendorMatch } from './types'
+import type { VendorMatch } from '../core/types'
 
 const SUPPORTED_VERDICTS = ['buy', 'hold', 'skip'] as const
 

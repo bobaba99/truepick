@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { OnboardingAnswers, UserRow } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { OnboardingAnswers, UserRow } from '../core/types'
 
 export async function getUserProfile(userId: string): Promise<UserRow | null> {
   const { data, error } = await supabase

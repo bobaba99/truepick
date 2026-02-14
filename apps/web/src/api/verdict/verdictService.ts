@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { supabase } from '../core/supabaseClient'
 import type {
   EvaluationResult,
   OnboardingAnswers,
@@ -6,7 +6,7 @@ import type {
   UserDecision,
   VerdictOutcome,
   VerdictRow,
-} from './types'
+} from '../core/types'
 import {
   computePatternRepetition,
   retrieveRecentPurchases,
@@ -15,9 +15,9 @@ import {
   retrieveVendorMatch,
 } from './verdictContext'
 import { buildScore, computeFinancialStrain } from './verdictScoring'
-import { clamp01 } from './utils'
+import { clamp01 } from '../core/utils'
 import { evaluateWithFallback, evaluateWithLlm, type EvaluationContext } from './verdictLLM'
-import { logger } from './logger'
+import { logger } from '../core/logger'
 
 const normalizeLikert = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) return 0

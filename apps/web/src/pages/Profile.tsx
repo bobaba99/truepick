@@ -9,13 +9,13 @@ import type {
   UserDecision,
   UserRow,
   VerdictRow,
-} from '../api/types'
-import { PURCHASE_CATEGORIES } from '../api/types'
+} from '../api/core/types'
+import { PURCHASE_CATEGORIES } from '../api/core/types'
 import {
   getUserProfile,
   createUserProfile,
   updateUserProfile,
-} from '../api/userProfileService'
+} from '../api/user/userProfileService'
 import {
   getVerdictHistory,
   updateVerdictDecision,
@@ -23,13 +23,13 @@ import {
   evaluatePurchase,
   submitVerdict,
   inputFromVerdict,
-} from '../api/verdictService'
+} from '../api/verdict/verdictService'
 import {
   getPurchaseHistory,
   createPurchase,
   updatePurchase,
   deletePurchase,
-} from '../api/purchaseService'
+} from '../api/purchase/purchaseService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
 import { GmailLogo, OutlookLogo } from '../components/EmailIcons'

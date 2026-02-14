@@ -11,7 +11,7 @@ import {
   calculateReceiptConfidence as calculateReceiptConfidenceService,
   filterEmailForReceipt as filterEmailForReceiptService,
   type FilterResult,
-} from '../services/emailProcessing'
+} from '../../services/emailProcessing'
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1'
 

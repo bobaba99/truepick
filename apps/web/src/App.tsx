@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
-import { supabase } from './api/supabaseClient'
+import { supabase } from './api/core/supabaseClient'
 import Dashboard from './pages/Dashboard'
 import Swipe from './pages/Swipe'
 import Profile from './pages/Profile'

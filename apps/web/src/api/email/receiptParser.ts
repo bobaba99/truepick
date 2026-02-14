@@ -3,7 +3,7 @@
  * Uses GPT-4o-mini to extract structured purchase data from email content
  */
 
-import type { PurchaseCategory } from './types'
+import type { PurchaseCategory } from '../core/types'
 import OpenAI from "openai";
 
 export type ExtractedReceipt = {
@@ -73,14 +73,15 @@ export async function parseReceiptWithAI(
   emailDate: string,
   openaiApiKey: string
 ): Promise<ExtractedReceipt[]> {
-  // Truncate content to avoid token limits (keep first 4000 chars)
-  const truncatedContent =
-    emailText.length > 4000 ? emailText.slice(0, 4000) + '...' : emailText
+  const buildPrompt = (contentLimit: number): string => {
+    const truncatedContent =
+      emailText.length > contentLimit ? emailText.slice(0, contentLimit) + '...' : emailText
 
-  const prompt = EXTRACTION_PROMPT.replace('{sender}', sender)
-    .replace('{subject}', subject)
-    .replace('{email_date}', emailDate)
-    .replace('{content}', truncatedContent)
+    return EXTRACTION_PROMPT.replace('{sender}', sender)
+      .replace('{subject}', subject)
+      .replace('{email_date}', emailDate)
+      .replace('{content}', truncatedContent)
+  }
 
   try {
     // Validate API key before making request
@@ -93,23 +94,26 @@ export async function parseReceiptWithAI(
       dangerouslyAllowBrowser: true,
     })
 
-    const response = await client.responses.parse({
-      model: 'gpt-5-nano',
-      text: { format: { type: 'json_object' } },
-      input: [{ role: 'user', content: prompt }],
-      max_output_tokens: 2000,
-    })
+    const parseAttempt = async (contentLimit: number, maxOutputTokens: number): Promise<string> => {
+      const response = await client.responses.parse({
+        model: 'gpt-5-nano',
+        text: { format: { type: 'json_object' } },
+        input: [{ role: 'user', content: buildPrompt(contentLimit) }],
+        max_output_tokens: maxOutputTokens,
+      })
 
-    if (response.error) {
-      throw new Error(response.error.message)
+      if (response.error) {
+        throw new Error(response.error.message)
+      }
+
+      if (response.incomplete_details?.reason) {
+        throw new Error(`OpenAI response incomplete: ${response.incomplete_details.reason}`)
+      }
+
+      return response.output_text?.trim() ?? ''
     }
 
-    if (response.incomplete_details?.reason) {
-      throw new Error(`OpenAI response incomplete: ${response.incomplete_details.reason}`)
-    }
-
-    const content = response.output_text?.trim()
-
+    const content = await parseAttempt(3000, 1500)
     if (!content) {
       return []
     }
@@ -148,6 +152,59 @@ export async function parseReceiptWithAI(
         )
       }
       throw new Error(errorMessage)
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes('OpenAI response incomplete: max_output_tokens')
+    ) {
+      try {
+        const client = new OpenAI({
+          apiKey: openaiApiKey,
+          dangerouslyAllowBrowser: true,
+        })
+
+        const retryResponse = await client.responses.parse({
+          model: 'gpt-5-nano',
+          text: { format: { type: 'json_object' } },
+          input: [{ role: 'user', content: buildPrompt(1400) }],
+          max_output_tokens: 700,
+        })
+
+        if (retryResponse.error) {
+          throw new Error(retryResponse.error.message)
+        }
+        if (retryResponse.incomplete_details?.reason) {
+          throw new Error(`OpenAI response incomplete: ${retryResponse.incomplete_details.reason}`)
+        }
+
+        const retryContent = retryResponse.output_text?.trim()
+        if (!retryContent) {
+          return []
+        }
+
+        const parsed = JSON.parse(retryContent)
+        if (parsed.not_a_receipt) {
+          return []
+        }
+
+        const items = Array.isArray(parsed.items)
+          ? parsed.items
+          : Array.isArray(parsed)
+            ? parsed
+            : [parsed]
+
+        const results: ExtractedReceipt[] = []
+        for (const item of items) {
+          const validated = validateAndNormalize(item, emailDate)
+          if (validated) {
+            results.push(validated)
+          }
+        }
+
+        return results
+      } catch {
+        throw error
+      }
     }
     if (error instanceof SyntaxError) {
       // JSON parse error - not a valid receipt response

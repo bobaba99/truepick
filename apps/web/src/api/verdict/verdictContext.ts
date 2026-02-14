@@ -1,7 +1,7 @@
-import { supabase } from './supabaseClient'
-import type { OnboardingAnswers, PurchaseInput, ScoreExplanation, VendorMatch } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { OnboardingAnswers, PurchaseInput, ScoreExplanation, VendorMatch } from '../core/types'
 import { getEmbeddings } from './embeddingService'
-import { cosineSimilarity } from './utils'
+import { cosineSimilarity } from '../core/utils'
 import { buildScore } from './verdictScoring'
 
 type PurchaseWithSwipe = {

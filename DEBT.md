@@ -1,3 +1,5 @@
+# Debt
+
 `fix/[]`
 
 - [ ] Add a loading bar during evaluation and regeneration, implement Claude-like words (e.g., fidgeting, coalescing)

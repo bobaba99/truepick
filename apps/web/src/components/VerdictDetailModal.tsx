@@ -1,4 +1,4 @@
-import type { VerdictRow } from '../api/types'
+import type { VerdictRow } from '../api/core/types'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
 
 type VerdictDetailModalProps = {

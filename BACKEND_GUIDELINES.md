@@ -7,8 +7,15 @@ Current backend is Supabase-first. `apps/web` talks directly to Supabase (tables
 ```
 supabase/
 ├── migrations/                    # Schema, RLS, SQL functions
-│   ├── 20260123050136_initial_schema.sql
-│   └── 20260129032546_vendor_data.sql
+│   ├── 20260123050136_initial_schema.sql          # compatibility shim
+│   ├── 20260129032546_vendor_data.sql             # compatibility shim
+│   ├── 20260214094217_modular_01_extensions_and_enums.sql
+│   ├── 20260214094217_modular_02_core_domain_tables.sql
+│   ├── 20260214094217_modular_03_ingestion_tables.sql
+│   ├── 20260214094217_modular_04_indexes.sql
+│   ├── 20260214094217_modular_05_rls_policies.sql
+│   ├── 20260214094217_modular_06_functions_triggers_and_compat.sql
+│   └── 20260214094218_vendor_data.sql
 ├── seed.sql                       # Local/dev seed data
 └── config.toml                    # Supabase local config
 
@@ -16,19 +23,40 @@ apps/api/src/
 └── index.ts                       # Express app (currently only /health)
 
 apps/web/src/api/
-├── supabaseClient.ts              # Supabase client bootstrap
-├── userProfileService.ts
-├── userValueService.ts
-├── purchaseService.ts
-├── swipeService.ts
-├── statsService.ts
-├── verdictService.ts
-├── verdictContext.ts
-├── embeddingService.ts
-├── gmailClient.ts                 # Gmail REST API wrapper
-├── receiptParser.ts               # GPT-4o-mini receipt extraction
-├── emailConnectionService.ts      # OAuth token CRUD
-└── importGmail.ts                 # Gmail receipt import orchestration
+├── core/
+│   ├── supabaseClient.ts          # Supabase client bootstrap
+│   ├── types.ts
+│   ├── utils.ts
+│   └── logger.ts
+├── email/
+│   ├── gmailClient.ts
+│   ├── outlookClient.ts
+│   ├── outlookAuth.ts
+│   ├── receiptParser.ts
+│   ├── emailConnectionService.ts
+│   ├── emailImportDedupService.ts
+│   ├── importGmail.ts
+│   ├── importOutlook.ts
+│   └── log/importLogger.ts
+├── purchase/
+│   ├── purchaseService.ts
+│   ├── swipeService.ts
+│   └── statsService.ts
+├── resource/
+│   ├── resourceService.ts
+│   └── adminResourceService.ts
+├── user/
+│   ├── userProfileService.ts
+│   └── userValueService.ts
+├── verdict/
+│   ├── verdictService.ts
+│   ├── verdictContext.ts
+│   ├── verdictLLM.ts
+│   ├── verdictPrompts.ts
+│   ├── verdictScoring.ts
+│   ├── verdictValidation.ts
+│   └── embeddingService.ts
+└── debug/                         # Import/debug scripts and artifacts
 ```
 
 ---
@@ -58,18 +86,32 @@ apps/web/src/api/
 - `verdicts`
 - `vendors`
 - `email_connections`
+- `email_processed_messages`
 
 **RPCs required by frontend services:**
 - `add_user_value`
 - `add_purchase`
 
 **External API calls from frontend today:**
-- `POST https://api.openai.com/v1/chat/completions`
+- `POST https://api.openai.com/v1/responses` (email receipt parsing)
+- `POST https://api.openai.com/v1/chat/completions` (verdict LLM evaluation)
 - `POST https://api.openai.com/v1/embeddings`
 - `GET https://gmail.googleapis.com/gmail/v1/users/me/messages` (Gmail list)
 - `GET https://gmail.googleapis.com/gmail/v1/users/me/messages/{id}` (Gmail get)
+- `GET https://graph.microsoft.com/v1.0/me/messages` (Outlook list)
+- `GET https://graph.microsoft.com/v1.0/me/messages/{id}` (Outlook get)
+- `GET/POST https://login.microsoftonline.com/common/oauth2/v2.0/*` (Outlook OAuth + token exchange)
 
-### 2.4 Service Return Patterns (Current)
+### 2.4 Email Import Pipeline (Gmail + Outlook)
+- Provider modules live under `apps/web/src/api/email/`.
+- Import orchestration:
+  - Pre-fetch dedupe by processed message ID (`email_processed_messages`)
+  - Deterministic pre-AI dedupe by extracted `order_id` candidates
+  - AI extraction (`receiptParser.ts`)
+  - Post-parse duplicate protection via purchase fingerprint checks + DB uniqueness
+- Import logs and markdown export live in `apps/web/src/api/email/log/importLogger.ts`.
+
+### 2.5 Service Return Patterns (Current)
 - Read flows: throw on Supabase error (e.g. `getUserProfile`, `getPurchaseHistory`)
 - Mutations: return `{ error: string | null }`
 - Keep this behavior consistent unless all callers are migrated together.
@@ -102,13 +144,15 @@ apps/web/src/api/
 - SQL schema + constraints + RLS + RPC functions are the source of truth.
 
 ### 4.2 Migrations
-- Create schema changes in new SQL migration files under `supabase/migrations/`.
-- Do not edit previous migrations after shared usage without explicit migration strategy.
+- Modular schema migrations (`20260214094217_modular_*.sql`) are the active bootstrap source of truth.
+- `20260123050136_initial_schema.sql` and `20260129032546_vendor_data.sql` are retained as compatibility shims for historical migration IDs.
+- Vendor seed data now lives in `20260214094218_vendor_data.sql`.
+- For new shared/production changes, prefer additive migrations and avoid editing already-applied history.
 
 ### 4.3 Seeding
 - Vendor and baseline data are seeded via:
   - `supabase/seed.sql`
-  - `20260129032546_vendor_data.sql`
+  - `20260214094218_vendor_data.sql`
 
 ### 4.4 Naming Conventions
 - Tables/columns: `snake_case`
@@ -119,6 +163,8 @@ apps/web/src/api/
 ### 4.5 Critical Constraints Expected by Frontend
 - Unique swipe per schedule and timing (`swipes` uniqueness rules)
 - Unique purchase per verdict link (`idx_purchases_verdict_unique`)
+- `purchases.source` allows provider-specific email values (`email:gmail`, `email:outlook`)
+- Unique processed email tracking key: `(user_id, provider, email_id)` on `email_processed_messages`
 - `purchase_stats`, `swipe_schedules`, `verdicts` filtered heavily by `user_id`
 
 ---
@@ -170,7 +216,7 @@ apps/web/src/api/
 - [ ] Mutating actions constrained by `user_id` ownership
 - [ ] Secrets only in environment variables
 - [ ] OpenAI key not exposed to untrusted clients in production architecture
-- [ ] No plaintext storage of OAuth tokens (`email_connections` fields must remain encrypted)
+- [ ] Move email OAuth token encryption server-side (currently saved in `encrypted_token` column but client code still notes TODO encryption)
 - [ ] Avoid `service_role` key usage in browser runtime
 
 ---
@@ -184,6 +230,7 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_OPENAI_API_KEY=
 VITE_GOOGLE_CLIENT_ID=      # For Gmail OAuth
+VITE_MICROSOFT_CLIENT_ID=   # For Outlook OAuth
 ```
 
 Required for API scaffold:
@@ -207,4 +254,4 @@ Notes:
 ### 10.2 Release Rules
 - Run migrations before frontend rollout that depends on new columns/policies/functions.
 - Treat RLS policy changes as high-risk; validate with representative user queries.
-- Keep `apps/web/src/api` contracts in sync with migration changes.
+- Keep `apps/web/src/api/*` contracts in sync with migration changes, especially `api/email/*` import pipeline behavior.

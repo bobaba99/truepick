@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import type { Stats, VerdictRow } from '../api/types'
-import { PURCHASE_CATEGORIES } from '../api/types'
-import { getSwipeStats } from '../api/statsService'
+import type { Stats, VerdictRow } from '../api/core/types'
+import { PURCHASE_CATEGORIES } from '../api/core/types'
+import { getSwipeStats } from '../api/purchase/statsService'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
 import {
   getVerdictHistory,
@@ -12,7 +12,7 @@ import {
   submitVerdict,
   inputFromVerdict,
   updateVerdictDecision,
-} from '../api/verdictService'
+} from '../api/verdict/verdictService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
 

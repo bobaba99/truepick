@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { PurchaseRow } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { PurchaseRow } from '../core/types'
 
 export async function getPurchaseHistory(
   userId: string,

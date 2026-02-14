@@ -8,15 +8,17 @@ import {
   deactivateEmailConnection,
   isTokenExpired,
   type EmailConnectionRow,
-} from '../api/emailConnectionService'
+} from '../api/email/emailConnectionService'
 import {
   importGmailReceipts,
   getEmailImportStats,
+  getEmailImportedPurchases,
   downloadMessagesMarkdown,
   type ImportResult,
-} from '../api/importGmail'
-import { importOutlookReceipts } from '../api/importOutlook'
-import { startOutlookOAuth, exchangeCodeForTokens, refreshOutlookToken } from '../api/outlookAuth'
+  type EmailImportedPurchase,
+} from '../api/email/importGmail'
+import { importOutlookReceipts } from '../api/email/importOutlook'
+import { startOutlookOAuth, exchangeCodeForTokens, refreshOutlookToken } from '../api/email/outlookAuth'
 
 type EmailSyncProps = {
   session: Session | null
@@ -39,17 +41,21 @@ type EmailProvider = 'gmail' | 'outlook'
 const getImportResultStorageKey = (userId: string) =>
   `${IMPORT_RESULT_STORAGE_PREFIX}:${userId}`
 
+const getProviderFromSource = (source: string): EmailProvider | null => {
+  if (source === 'email:gmail') return 'gmail'
+  if (source === 'email:outlook') return 'outlook'
+  if (source === 'email') return 'gmail' // legacy fallback
+  return null
+}
+
 export default function EmailSync({ session }: EmailSyncProps) {
   const [connection, setConnection] = useState<EmailConnectionRow | null>(null)
   const [status, setStatus] = useState<Status>({ type: 'idle' })
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [hasHydratedImportResult, setHasHydratedImportResult] = useState(false)
   const [stats, setStats] = useState<{ totalImported: number; lastSyncDate: string | null } | null>(null)
+  const [allImports, setAllImports] = useState<EmailImportedPurchase[]>([])
   const [isImporting, setIsImporting] = useState(false)
-  const [provider, setProvider] = useState<EmailProvider>(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('provider') === 'outlook' ? 'outlook' : 'gmail'
-  })
 
   const userId = session?.user?.id
 
@@ -58,12 +64,14 @@ export default function EmailSync({ session }: EmailSyncProps) {
     if (!userId) return
 
     try {
-      const [conn, importStats] = await Promise.all([
+      const [conn, importStats, purchases] = await Promise.all([
         getEmailConnection(userId),
         getEmailImportStats(userId),
+        getEmailImportedPurchases(userId),
       ])
       setConnection(conn)
       setStats(importStats)
+      setAllImports(purchases)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load connection'
       setStatus({ type: 'error', message })
@@ -217,7 +225,6 @@ export default function EmailSync({ session }: EmailSyncProps) {
         if (error) {
           setStatus({ type: 'error', message: error })
         } else {
-          setProvider('outlook')
           setStatus({ type: 'success', message: 'Outlook connected successfully!' })
           loadConnectionData()
         }
@@ -228,33 +235,47 @@ export default function EmailSync({ session }: EmailSyncProps) {
       })
   }, [userId, loadConnectionData])
 
-  // Disconnect Gmail
-  const handleDisconnect = async () => {
+  const handleDisconnect = async (provider: EmailProvider) => {
     if (!userId) return
+    const activeConnection = connection?.provider === provider ? connection : null
+    const providerName = provider === 'outlook' ? 'Outlook' : 'Gmail'
 
-    setStatus({ type: 'loading', message: 'Disconnecting...' })
+    if (!activeConnection?.is_active) {
+      setStatus({ type: 'error', message: `${providerName} is not connected.` })
+      return
+    }
+
+    setStatus({ type: 'loading', message: `Disconnecting ${providerName}...` })
     const { error } = await deactivateEmailConnection(userId)
 
     if (error) {
       setStatus({ type: 'error', message: error })
     } else {
       setConnection(null)
-      setStatus({ type: 'success', message: 'Gmail disconnected' })
+      setStatus({ type: 'success', message: `${providerName} disconnected` })
     }
   }
 
   // Import receipts
-  const handleImport = async () => {
-    if (!userId || !connection) return
+  const handleImport = async (provider: EmailProvider) => {
+    if (!userId) return
+    const activeConnection = connection?.provider === provider ? connection : null
+    if (!activeConnection) {
+      setStatus({
+        type: 'error',
+        message: `Please connect ${provider === 'outlook' ? 'Outlook' : 'Gmail'} first.`,
+      })
+      return
+    }
 
-    let accessToken = connection.encrypted_token
+    let accessToken = activeConnection.encrypted_token
 
     // If token is expired, try to refresh (Outlook only — Gmail uses implicit flow)
-    if (isTokenExpired(connection)) {
-      if (connection.provider === 'outlook' && connection.refresh_token && MICROSOFT_CLIENT_ID) {
+    if (isTokenExpired(activeConnection)) {
+      if (provider === 'outlook' && activeConnection.refresh_token && MICROSOFT_CLIENT_ID) {
         try {
           setStatus({ type: 'loading', message: 'Refreshing Outlook token...' })
-          const refreshed = await refreshOutlookToken(MICROSOFT_CLIENT_ID, connection.refresh_token)
+          const refreshed = await refreshOutlookToken(MICROSOFT_CLIENT_ID, activeConnection.refresh_token)
           await saveEmailConnection(userId, {
             provider: 'outlook',
             accessToken: refreshed.accessToken,
@@ -271,7 +292,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
       } else {
         setStatus({
           type: 'error',
-          message: `Token expired. Please reconnect ${connection.provider === 'outlook' ? 'Outlook' : 'Gmail'}.`,
+          message: `Token expired. Please reconnect ${provider === 'outlook' ? 'Outlook' : 'Gmail'}.`,
         })
         return
       }
@@ -287,7 +308,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
 
     try {
       const importFn =
-        connection.provider === 'outlook'
+        provider === 'outlook'
           ? importOutlookReceipts
           : importGmailReceipts
 
@@ -302,20 +323,45 @@ export default function EmailSync({ session }: EmailSyncProps) {
       )
 
       setImportResult(result)
-      setStatus({
-        type: 'success',
-        message: `Imported ${result.imported.length} receipts`,
-      })
+
+      if (result.imported.length === 0 && result.errors.length > 0) {
+        setStatus({
+          type: 'error',
+          message: `Import failed with ${result.errors.length} error(s): ${result.errors[0]}`,
+        })
+      } else if (result.errors.length > 0) {
+        setStatus({
+          type: 'success',
+          message: `Imported ${result.imported.length} receipts (${result.errors.length} error(s))`,
+        })
+      } else {
+        setStatus({
+          type: 'success',
+          message: `Imported ${result.imported.length} receipts`,
+        })
+      }
       loadConnectionData()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed'
+      const raw = err instanceof Error ? err.message : 'Import failed'
+      const isAuthError =
+        raw.includes('Access token') ||
+        raw.includes('InvalidAuthenticationToken') ||
+        raw.includes('401') ||
+        raw.includes('Unauthorized')
+      const providerName = provider === 'outlook' ? 'Outlook' : 'Gmail'
+      const message = isAuthError
+        ? `${providerName} connection expired. Please disconnect and reconnect.`
+        : raw
       setStatus({ type: 'error', message })
     } finally {
       setIsImporting(false)
     }
   }
 
-  const isConnected = connection?.is_active && !isTokenExpired(connection)
+  const isGmailConnected =
+    connection?.provider === 'gmail' && connection.is_active && !isTokenExpired(connection)
+  const isOutlookConnected =
+    connection?.provider === 'outlook' && connection.is_active && !isTokenExpired(connection)
 
   return (
     <section className="route-content">
@@ -324,24 +370,6 @@ export default function EmailSync({ session }: EmailSyncProps) {
       </div>
 
       <GlassCard className="email-sync-container">
-        <div className="provider-tabs">
-          <button
-            className={`provider-tab ${provider === 'gmail' ? 'active' : ''}`}
-            onClick={() => setProvider('gmail')}
-            type="button"
-          >
-            <GmailLogo className="tab-icon" />
-            Gmail
-          </button>
-          <button
-            className={`provider-tab ${provider === 'outlook' ? 'active' : ''}`}
-            onClick={() => setProvider('outlook')}
-            type="button"
-          >
-            <OutlookLogo className="tab-icon" />
-            Outlook
-          </button>
-        </div>
         <div className="dashboard-grid">
           {/* Connection Card */}
           <div className="content-panel">
@@ -358,56 +386,91 @@ export default function EmailSync({ session }: EmailSyncProps) {
             )}
 
             <div className="email-providers">
-              {isConnected ? (
-                <div className="connected-status">
-                  <div className="provider-info">
-                    {connection.provider === 'outlook' ? (
-                      <OutlookLogo className="provider-logo" />
-                    ) : (
-                      <GmailLogo className="provider-logo" />
-                    )}
-                    <span>{connection.provider === 'outlook' ? 'Outlook' : 'Gmail'} Connected</span>
-                  </div>
-                  <div className="connection-actions">
-                    <LiquidButton
-                      className="primary"
-                      onClick={handleImport}
-                      type="button"
-                      disabled={isImporting}
-                    >
-                      {isImporting ? 'Importing...' : 'Import Receipts'}
-                    </LiquidButton>
-                    <LiquidButton
-                      className="ghost"
-                      onClick={handleDisconnect}
-                      type="button"
-                      disabled={isImporting}
-                    >
-                      Disconnect
-                    </LiquidButton>
-                  </div>
+              <div className="provider-section">
+                <div className="provider-section-heading">
+                  <GmailLogo className="provider-logo" />
+                  <span>Gmail</span>
                 </div>
-              ) : provider === 'outlook' ? (
-                <LiquidButton
-                  className="primary"
-                  onClick={handleConnectOutlook}
-                  type="button"
-                  disabled={!session}
-                >
-                  <OutlookLogo className="button-icon" />
-                  Connect Outlook
-                </LiquidButton>
-              ) : (
-                <LiquidButton
-                  className="primary"
-                  onClick={handleConnectGmail}
-                  type="button"
-                  disabled={!session}
-                >
-                  <GmailLogo className="button-icon" />
-                  Connect Gmail
-                </LiquidButton>
-              )}
+
+                {isGmailConnected ? (
+                  <div className="connected-status">
+                    <div className="provider-info">
+                      <span>Connected</span>
+                    </div>
+                    <div className="connection-actions">
+                      <LiquidButton
+                        className="primary"
+                        onClick={() => handleImport('gmail')}
+                        type="button"
+                        disabled={isImporting}
+                      >
+                        {isImporting ? 'Importing...' : 'Import Gmail Receipts'}
+                      </LiquidButton>
+                      <LiquidButton
+                        className="ghost danger"
+                        onClick={() => handleDisconnect('gmail')}
+                        type="button"
+                        disabled={isImporting}
+                      >
+                        Disconnect Gmail
+                      </LiquidButton>
+                    </div>
+                  </div>
+                ) : (
+                  <LiquidButton
+                    className="primary"
+                    onClick={handleConnectGmail}
+                    type="button"
+                    disabled={!session || isImporting}
+                  >
+                    <GmailLogo className="button-icon" />
+                    Connect Gmail
+                  </LiquidButton>
+                )}
+              </div>
+
+              <div className="provider-section">
+                <div className="provider-section-heading">
+                  <OutlookLogo className="provider-logo" />
+                  <span>Outlook</span>
+                </div>
+
+                {isOutlookConnected ? (
+                  <div className="connected-status">
+                    <div className="provider-info">
+                      <span>Connected</span>
+                    </div>
+                    <div className="connection-actions">
+                      <LiquidButton
+                        className="primary"
+                        onClick={() => handleImport('outlook')}
+                        type="button"
+                        disabled={isImporting}
+                      >
+                        {isImporting ? 'Importing...' : 'Import Outlook Receipts'}
+                      </LiquidButton>
+                      <LiquidButton
+                        className="ghost danger"
+                        onClick={() => handleDisconnect('outlook')}
+                        type="button"
+                        disabled={isImporting}
+                      >
+                        Disconnect Outlook
+                      </LiquidButton>
+                    </div>
+                  </div>
+                ) : (
+                  <LiquidButton
+                    className="primary"
+                    onClick={handleConnectOutlook}
+                    type="button"
+                    disabled={!session || isImporting}
+                  >
+                    <OutlookLogo className="button-icon" />
+                    Connect Outlook
+                  </LiquidButton>
+                )}
+              </div>
             </div>
 
             {stats && (
@@ -423,7 +486,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
 
             {importResult && (
               <div className="import-result">
-                <h3>Import Results</h3>
+                <h3>Latest Import</h3>
                 <ul>
                   <li>Imported: {importResult.imported.length}</li>
                   <li>Skipped (duplicates/non-receipts): {importResult.skipped}</li>
@@ -431,18 +494,6 @@ export default function EmailSync({ session }: EmailSyncProps) {
                     <li>Errors: {importResult.errors.length}</li>
                   )}
                 </ul>
-                {importResult.imported.length > 0 && (
-                  <div className="imported-list">
-                    <h4>New Purchases</h4>
-                    {importResult.imported.map((item, idx) => (
-                      <div key={idx} className="imported-item">
-                        <span className="item-title">{item.title}</span>
-                        <span className="item-vendor">{item.vendor}</span>
-                        <span className="item-price">${item.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
                 <div className="import-actions">
                   <LiquidButton
                     className="ghost"
@@ -451,6 +502,34 @@ export default function EmailSync({ session }: EmailSyncProps) {
                   >
                     Download Import Log
                   </LiquidButton>
+                </div>
+              </div>
+            )}
+
+            {allImports.length > 0 && (
+              <div className="import-result">
+                <h3>All Imported Purchases</h3>
+                <div className="imported-list">
+                  {allImports.map((item) => {
+                    const itemProvider = getProviderFromSource(item.source)
+                    return (
+                      <div key={item.id} className="imported-item">
+                        <span className="item-provider">
+                          {itemProvider === 'outlook' ? (
+                            <OutlookLogo className="item-provider-icon" />
+                          ) : (
+                            <GmailLogo className="item-provider-icon" />
+                          )}
+                        </span>
+                        <span className="item-title">{item.title}</span>
+                        <span className="item-vendor">{item.vendor ?? ''}</span>
+                        <span className="item-price">${item.price.toFixed(2)}</span>
+                        <span className="item-date">
+                          {new Date(item.purchase_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -463,7 +542,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
             <h3>Step-by-step workflow</h3>
             <ol>
               <li><strong>OAuth prompt</strong> — you authorize read-only access</li>
-              <li><strong>Permission grant</strong> — limited to gmail.readonly scope</li>
+              <li><strong>Permission grant</strong> — limited to Gmail readonly / Outlook Mail.Read scopes</li>
               <li><strong>Receipt scan</strong> — we search for order confirmations</li>
               <li><strong>AI extraction</strong> — GPT extracts product details</li>
               <li><strong>Deduplication</strong> — no duplicate imports via order ID</li>
@@ -498,16 +577,10 @@ export default function EmailSync({ session }: EmailSyncProps) {
 
             <h3>How to revoke access</h3>
             <p>
-              Click &quot;Disconnect&quot; above, or visit your{' '}
-              {provider === 'outlook' ? (
-                <a
-                  href="https://account.live.com/consent/Manage"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Microsoft Account permissions
-                </a>
-              ) : (
+              Click the corresponding &quot;Disconnect&quot; button above, or revoke permissions directly:
+            </p>
+            <ul>
+              <li>
                 <a
                   href="https://myaccount.google.com/permissions"
                   target="_blank"
@@ -515,9 +588,17 @@ export default function EmailSync({ session }: EmailSyncProps) {
                 >
                   Google Account permissions
                 </a>
-              )}{' '}
-              to revoke access at any time.
-            </p>
+              </li>
+              <li>
+                <a
+                  href="https://account.live.com/consent/Manage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Microsoft Account permissions
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
       </GlassCard>

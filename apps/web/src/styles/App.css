@@ -2921,10 +2921,29 @@
   font-size: 0.8rem;
 }
 
+.imported-item .item-provider {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  margin-right: 0.75rem;
+}
+
+.imported-item .item-provider-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .imported-item .item-price {
   flex: 0 0 auto;
   color: var(--ink-700);
   font-weight: 600;
+}
+
+.imported-item .item-date {
+  flex: 0 0 auto;
+  margin-left: 1rem;
+  color: var(--ink-500);
+  font-size: 0.8rem;
 }
 
 .import-actions {
@@ -2937,12 +2956,35 @@
 
 .connection-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  row-gap: 0.75rem;
   flex-wrap: wrap;
+  padding-top: 0.25rem;
 }
 
 .email-providers {
-  margin-top: 0.75rem;
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.provider-section {
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.provider-section-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink-800);
 }
 
 .connected-status {
@@ -2957,6 +2999,7 @@
   font-size: 1.05rem;
   font-weight: 500;
   color: var(--ink-800);
+  line-height: 1.4;
 }
 
 .provider-logo,
@@ -2966,11 +3009,50 @@
   flex-shrink: 0;
 }
 
+.provider-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.provider-tabs .provider-tab {
+  min-height: 44px;
+  min-width: 120px;
+  padding: 0.6rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.provider-tabs .provider-tab .tab-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.provider-tabs .provider-tab.active {
+  background: #fff;
+  color: #000;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.25);
+}
+
 .connection-actions .primary,
 .connection-actions .ghost,
 .import-actions .primary,
 .import-actions .ghost {
   min-height: 44px;
+  min-width: 140px;
   padding: 0.72rem 1.25rem;
   display: inline-flex;
   align-items: center;
@@ -2982,7 +3064,7 @@
 
 .connection-actions .liquid-button::before,
 .import-actions .liquid-button::before,
-.email-providers > .liquid-button::before {
+.provider-section > .liquid-button::before {
   inset: 1px;
   border-radius: inherit;
   background: radial-gradient(
@@ -2991,4 +3073,12 @@
     rgba(255, 255, 255, 0.08) 35%,
     transparent 70%
   );
+}
+
+.import-stats {
+  margin-top: 1.5rem;
+}
+
+.import-stats p {
+  margin: 0;
 }

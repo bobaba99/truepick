@@ -11,7 +11,14 @@ import {
 } from './outlookClient'
 import { parseReceiptWithAI, type ExtractedReceipt } from './receiptParser'
 import { updateLastSync } from './emailConnectionService'
-import { supabase } from './supabaseClient'
+import { supabase } from '../core/supabaseClient'
+import {
+  extractCandidateOrderIds,
+  hasExistingPurchaseFingerprint,
+  getExistingOrderIds,
+  getProcessedEmailIds,
+  markEmailAsProcessed,
+} from './emailImportDedupService'
 import {
   startImportLog,
   logImport,
@@ -50,9 +57,10 @@ export type ImportResult = {
 /**
  * Import purchase receipts from Outlook
  * 1. Fetches recent emails matching receipt patterns via Microsoft Graph
- * 2. Filters to likely receipts
- * 3. Parses with GPT to extract purchase data
- * 4. Creates purchases via add_purchase RPC (with deduplication)
+ * 2. Skips emails already processed in previous imports
+ * 3. Filters to likely receipts and pre-checks existing order IDs
+ * 4. Parses with GPT to extract purchase data
+ * 5. Creates purchases via add_purchase RPC (with deduplication)
  */
 export async function importOutlookReceipts(
   accessToken: string,
@@ -77,41 +85,64 @@ export async function importOutlookReceipts(
   const errors: string[] = []
   let skipped = 0
 
-  // Fetch in batches: start with INITIAL_BATCH, then REFILL_BATCH until maxMessages hits
+  // Fetch in batches using @odata.nextLink pagination
   const INITIAL_BATCH = 50
-  const REFILL_BATCH = 25
   const MAX_EMAILS_SCANNED = 500
 
-  let totalFetched = 0
   let totalScanned = 0
 
   // First batch
-  let messageHeaders = await listMessagesFiltered(accessToken, sinceDays, INITIAL_BATCH)
-  totalFetched += messageHeaders.length
+  const firstResult = await listMessagesFiltered(accessToken, sinceDays, INITIAL_BATCH)
+  let messageHeaders = firstResult.messages
+  let nextLink = firstResult.nextLink
 
   if (messageHeaders.length === 0) {
     const log = endImportLog()
     return { imported: [], skipped: 0, errors: [], log }
   }
 
+  const provider = 'outlook' as const
+  let processedEmailIds = await getProcessedEmailIds(
+    userId,
+    provider,
+    messageHeaders.map((message) => message.id)
+  )
+
   let headerIndex = 0
 
   while (results.length < maxMessages && totalScanned < MAX_EMAILS_SCANNED) {
-    // If we've exhausted current batch, fetch more using $skip
+    // If we've exhausted current batch, fetch more via nextLink
     if (headerIndex >= messageHeaders.length) {
-      const nextBatch = await listMessagesFiltered(
-        accessToken, sinceDays, REFILL_BATCH, totalFetched
+      if (!nextLink) break
+
+      const nextResult = await listMessagesFiltered(
+        accessToken, sinceDays, INITIAL_BATCH, nextLink
       )
-      messageHeaders = nextBatch
-      totalFetched += nextBatch.length
+      messageHeaders = nextResult.messages
+      nextLink = nextResult.nextLink
       headerIndex = 0
 
       if (messageHeaders.length === 0) break
+
+      processedEmailIds = await getProcessedEmailIds(
+        userId,
+        provider,
+        messageHeaders.map((message) => message.id)
+      )
     }
 
     const header = messageHeaders[headerIndex]
     totalScanned++
     headerIndex++
+
+    if (processedEmailIds.has(header.id)) {
+      skipped++
+      logSkip({
+        emailId: header.id,
+        reason: 'already_processed_email_id',
+      })
+      continue
+    }
 
     try {
       // Get full message content
@@ -138,7 +169,44 @@ export async function importOutlookReceipts(
           reason: filterResult.rejectionReason ?? 'unknown',
           confidence: filterResult.confidence,
         })
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
         continue
+      }
+
+      const candidateOrderIds = extractCandidateOrderIds(parsed.subject, parsed.textContent)
+      if (candidateOrderIds.length > 0) {
+        const existingOrderIds = await getExistingOrderIds(userId, candidateOrderIds)
+
+        if (existingOrderIds.size > 0) {
+          logFetchedMessage({
+            emailId: header.id,
+            from: parsed.from,
+            subject: parsed.subject,
+            date: parsed.date,
+            textContent: parsed.textContent,
+            filterResult,
+          })
+          skipped++
+          logSkip({
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            reason: 'existing_order_id_pre_ai',
+          })
+          await markProcessedEmailSafely({
+            userId,
+            provider,
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            errors,
+          })
+          continue
+        }
       }
 
       // Parse with AI - returns array of receipts (one per item)
@@ -173,13 +241,36 @@ export async function importOutlookReceipts(
           emailSubject: parsed.subject,
           reason: 'llm_returned_empty',
         })
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
         continue
       }
+
+      let hitMessageImportLimit = false
 
       // Create purchases for each item in the receipt
       for (const receipt of receipts) {
         // Check if we've reached the max
-        if (results.length >= maxMessages) break
+        if (results.length >= maxMessages) {
+          hitMessageImportLimit = true
+          break
+        }
+
+        const fingerprintDuplicate = await hasExistingPurchaseFingerprint(userId, receipt)
+        if (fingerprintDuplicate) {
+          skipped++
+          logSkip({
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            reason: 'duplicate_purchase_fingerprint',
+          })
+          continue
+        }
 
         // Create purchase via RPC (handles deduplication via order_id constraint)
         const { error, isDuplicate } = await createEmailPurchase(receipt)
@@ -220,6 +311,16 @@ export async function importOutlookReceipts(
         })
       }
 
+      if (!hitMessageImportLimit) {
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
+      }
+
       // Rate limiting: brief pause between API calls
       await sleep(100)
     } catch (err) {
@@ -241,6 +342,26 @@ export async function importOutlookReceipts(
   return { imported: results, skipped, errors, log }
 }
 
+async function markProcessedEmailSafely(args: {
+  userId: string
+  provider: 'gmail' | 'outlook'
+  emailId: string
+  emailSubject?: string
+  errors: string[]
+}): Promise<void> {
+  try {
+    await markEmailAsProcessed(args.userId, args.provider, args.emailId)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    args.errors.push(`Failed to mark email ${args.emailId} as processed: ${message}`)
+    logError({
+      emailId: args.emailId,
+      emailSubject: args.emailSubject,
+      reason: `mark_processed_failed: ${message}`,
+    })
+  }
+}
+
 /**
  * Create a purchase from an extracted email receipt
  */
@@ -253,7 +374,7 @@ async function createEmailPurchase(
     p_vendor: receipt.vendor,
     p_category: receipt.category,
     p_purchase_date: receipt.purchase_date,
-    p_source: 'email',
+    p_source: 'email:outlook',
     p_verdict_id: null,
     p_is_past_purchase: true,
     p_past_purchase_outcome: null,
@@ -262,16 +383,18 @@ async function createEmailPurchase(
 
   if (error) {
     // Detect duplicate via various error indicators
+    const errorCode = error.code?.toString() ?? ''
+    const errorMsg = error.message?.toLowerCase() ?? ''
+    const errorDetails = error.details?.toLowerCase() ?? ''
     const isDuplicate =
-      error.code === '23505' ||
-      error.code === '409' ||
-      error.message.toLowerCase().includes('duplicate') ||
-      error.message.toLowerCase().includes('conflict') ||
-      error.details?.toLowerCase().includes('unique') ||
-      error.details?.toLowerCase().includes('order_id') ||
-      false
+      errorCode === '23505' ||
+      errorCode === '409' ||
+      errorMsg.includes('duplicate') ||
+      errorMsg.includes('conflict') ||
+      errorDetails.includes('unique') ||
+      errorDetails.includes('order_id')
 
-    return { error: error.message, isDuplicate }
+    return { error: isDuplicate ? null : error.message, isDuplicate }
   }
 
   return { error: null, isDuplicate: false }

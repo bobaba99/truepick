@@ -8,7 +8,7 @@ import {
   cleanEmailTextForReceipt,
   filterEmailForReceipt as filterEmailForReceiptService,
   type FilterResult,
-} from '../services/emailProcessing'
+} from '../../services/emailProcessing'
 
 const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0'
 
@@ -16,6 +16,11 @@ const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0'
 
 export type OutlookMessageHeader = {
   id: string
+}
+
+export type OutlookListResult = {
+  messages: OutlookMessageHeader[]
+  nextLink: string | null
 }
 
 export type OutlookEmailAddress = {
@@ -46,32 +51,30 @@ export type ParsedEmail = {
 
 /**
  * List messages matching a search query using Microsoft Graph
- * Uses $search for keyword matching and $filter for date range
+ * Uses $search for keyword matching. Pagination via @odata.nextLink
+ * ($skip is not supported with $search).
  */
 export async function listMessages(
   accessToken: string,
   searchQuery: string,
   maxResults: number = 100,
-  skip: number = 0
-): Promise<OutlookMessageHeader[]> {
-  const params = new URLSearchParams({
-    $search: `"${searchQuery}"`,
-    $top: maxResults.toString(),
-    $select: 'id',
-  })
-  if (skip > 0) {
-    params.set('$skip', skip.toString())
-  }
+  nextLink?: string
+): Promise<OutlookListResult> {
+  const url = nextLink ?? (() => {
+    const params = new URLSearchParams({
+      $search: `"${searchQuery}"`,
+      $top: maxResults.toString(),
+      $select: 'id',
+    })
+    return `${GRAPH_API_BASE}/me/messages?${params}`
+  })()
 
-  const response = await fetch(
-    `${GRAPH_API_BASE}/me/messages?${params}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  })
 
   if (!response.ok) {
     const error = await response.json()
@@ -81,7 +84,8 @@ export async function listMessages(
   }
 
   const data = await response.json()
-  return (data.value ?? []).map((msg: { id: string }) => ({ id: msg.id }))
+  const messages = (data.value ?? []).map((msg: { id: string }) => ({ id: msg.id }))
+  return { messages, nextLink: data['@odata.nextLink'] ?? null }
 }
 
 /**
@@ -186,45 +190,19 @@ export function buildDateFilter(sinceDays: number = 90): string {
 }
 
 /**
- * List messages with both search and date filter
+ * List messages with search query.
+ * Microsoft Graph does not reliably support $search + $filter together,
+ * so we use $search only and rely on the receipt query keywords for relevance.
+ * Pagination via @odata.nextLink.
  */
 export async function listMessagesFiltered(
   accessToken: string,
-  sinceDays: number = 90,
+  _sinceDays: number = 90,
   maxResults: number = 100,
-  skip: number = 0
-): Promise<OutlookMessageHeader[]> {
+  nextLink?: string
+): Promise<OutlookListResult> {
   const searchQuery = buildReceiptQuery()
-  const dateFilter = buildDateFilter(sinceDays)
-
-  const params = new URLSearchParams({
-    $search: `"${searchQuery}"`,
-    $filter: dateFilter,
-    $top: maxResults.toString(),
-    $select: 'id',
-  })
-  if (skip > 0) {
-    params.set('$skip', skip.toString())
-  }
-
-  const response = await fetch(
-    `${GRAPH_API_BASE}/me/messages?${params}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        ConsistencyLevel: 'eventual',
-      },
-    }
-  )
-
-  // If $search + $filter fails, fall back to $search only
-  if (!response.ok) {
-    return listMessages(accessToken, searchQuery, maxResults, skip)
-  }
-
-  const data = await response.json()
-  return (data.value ?? []).map((msg: { id: string }) => ({ id: msg.id }))
+  return listMessages(accessToken, searchQuery, maxResults, nextLink)
 }
 
 export type { FilterResult }

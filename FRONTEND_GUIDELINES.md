@@ -254,20 +254,36 @@ import { LiquidButton } from '../components/Kinematics'
   Cancel
 </LiquidButton>
 
+// Ghost button with danger styling (destructive actions)
+<LiquidButton className="ghost danger" onClick={handleDelete}>
+  Delete
+</LiquidButton>
+
 // As a link (polymorphic)
 <LiquidButton as={Link} to="/profile" className="primary">
   View Profile
 </LiquidButton>
+
+// Provider tab (toggle buttons)
+<LiquidButton 
+  className={`ghost provider-tab ${isActive ? 'active' : ''}`}
+  onClick={handleTabChange}
+>
+  <GmailLogo className="tab-icon" />
+  Gmail
+</LiquidButton>
+
+// Tab icon requirements: 20x20px, flex-shrink: 0 for consistent alignment
 ```
 
 | Prop | Type | Description |
 |------|------|-------------|
 | `as` | `ElementType` | Render as different element (default: `button`) |
-| `className` | `string` | CSS classes (`primary`, `ghost`, `link`, `danger`) |
+| `className` | `string` | CSS classes (`primary`, `ghost`, `link`, `danger`, `provider-tab`) |
 | `children` | `ReactNode` | Button content |
 
 **Used in:** Dashboard, Profile, Swipe, EmailSync, AdminResources
-**CSS Classes:** `.liquid-button`, `.primary`, `.ghost`, `.link`
+**CSS Classes:** `.liquid-button`, `.primary`, `.ghost`, `.link`, `.provider-tab`
 
 ---
 
@@ -564,9 +580,10 @@ import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 ### 12.4 EmailSync (`pages/EmailSync.tsx`)
 
 **Route:** `/email-sync`
-**Purpose:** Connect Gmail and import receipts
+**Purpose:** Connect Gmail/Outlook and import receipts
 
 **Key Features:**
+- Provider tabs (Gmail/Outlook) with LiquidButton toggle
 - OAuth connection flow
 - Import receipts with AI parsing
 - View import results
@@ -574,30 +591,45 @@ import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Connect Email                │  How It Works           │
-│  ┌──────────────────────────┐ │  1. OAuth prompt        │
-│  │ [Gmail Logo] Connected   │ │  2. Permission grant    │
-│  │ [Import] [Disconnect]    │ │  3. Receipt scan        │
-│  └──────────────────────────┘ │  4. AI extraction       │
-│                               │  5. Deduplication       │
-│  5 receipts imported          │                         │
-│  Last sync: Jan 15, 2024      │  What we scan:          │
-│                               │  - Order confirmations  │
-│  Import Results               │  - Receipt emails       │
-│  ┌──────────────────────────┐ │                         │
-│  │ iPhone Case - $29.99     │ │  What we never read:    │
-│  │ Netflix - $15.99         │ │  - Personal messages    │
-│  └──────────────────────────┘ │  - Attachments          │
+│  [Gmail] [Outlook]            │  How It Works           │
+│                               │  1. OAuth prompt        │
+│  Connect Email                │  2. Permission grant    │
+│  ┌──────────────────────────┐ │  3. Receipt scan        │
+│  │ [Gmail Logo] Connected   │ │  4. AI extraction       │
+│  │ [Import] [Disconnect]    │ │  5. Deduplication       │
+│  └──────────────────────────┘ │                         │
+│                               │  What we scan:          │
+│  5 receipts imported          │  - Order confirmations  │
+│  Last sync: Jan 15, 2024      │  - Receipt emails       │
+│                               │                         │
+│  Import Results               │  What we never read:    │
+│  ┌──────────────────────────┐ │  - Personal messages    │
+│  │ iPhone Case - $29.99     │ │  - Attachments          │
+│  │ Netflix - $15.99         │ │                         │
+│  └──────────────────────────┘ │                         │
 │  [Download Import Log]        │                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
+**Components Used:**
+- `GlassCard` - Main container
+- `LiquidButton` - All buttons including provider tabs
+  - Provider tabs: `ghost provider-tab` classes with `active` state
+  - Tab icons: `tab-icon` class for 20x20px consistent sizing
+  - Primary actions: `primary` class
+  - Disconnect: `ghost danger` class (destructive action)
+
 **CSS Classes Used:**
 - `.email-sync-container` - Main card
+- `.provider-tabs` - Tab container with flex layout
+- `.provider-tab` - Individual tab button (44px height, 120px min-width)
+- `.provider-tab.active` - Selected tab (white background, black text)
 - `.content-panel` - Left/right panels
-- `.email-providers` - Provider buttons
+- `.email-providers` - Provider buttons container
 - `.connected-status`, `.provider-info` - Connection display
+- `.connection-actions` - Action button group (Import/Disconnect)
 - `.import-result`, `.imported-list` - Results display
+- `.import-actions` - Download log button container
 
 ---
 
@@ -660,6 +692,8 @@ import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 | `.route-surface` | Glassmorphic content surface | AppShell |
 | `.dashboard-grid` | Two-column responsive grid | Dashboard, Profile, Admin |
 | `.content-panel` | Panel within dashboard grid | EmailSync |
+| `.connection-actions` | Paired action buttons container | EmailSync (Import/Disconnect) |
+| `.import-actions` | Import result actions | EmailSync (Download log) |
 
 ### 13.2 Card Classes
 
@@ -685,6 +719,10 @@ import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 | `.link.danger` | Destructive link | Red text |
 | `.decision-btn` | Verdict action button | Colored by outcome |
 | `.swipe-button` | Large swipe action | Circular, colored variants |
+| `.provider-tabs` | Provider toggle container | Flex layout for Gmail/Outlook tabs |
+| `.provider-tab` | Individual provider tab | 44px height, 120px min-width, 0.75rem gap between icon and text |
+| `.provider-tab.active` | Selected provider tab | White background, black text, shadow |
+| `.tab-icon` | Icon inside provider tab | 20x20px, inline-flex centered, vertical-align: middle |
 
 ### 13.4 Form Classes
 

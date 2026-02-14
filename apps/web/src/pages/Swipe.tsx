@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../api/types'
-import { getUnratedPurchases, createSwipe, deleteSwipe } from '../api/swipeService'
+import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../api/core/types'
+import { getUnratedPurchases, createSwipe, deleteSwipe } from '../api/purchase/swipeService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
 
 type SwipeProps = {

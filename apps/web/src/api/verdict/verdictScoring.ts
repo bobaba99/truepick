@@ -4,8 +4,8 @@ import type {
   ScoreExplanation,
   VerdictOutcome,
   VendorMatch,
-} from './types'
-import { clamp01, computePriceThresholds } from './utils'
+} from '../core/types'
+import { clamp01, computePriceThresholds } from '../core/utils'
 
 export const VENDOR_RUBRIC = {
   quality: {

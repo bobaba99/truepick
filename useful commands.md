@@ -49,12 +49,14 @@ Clean up work trees:
 `git branch -d feat/purchase-email-import-flow`
 
 # Pulling changes from main branch on work trees
+
 `git fetch origin`
 `git stash`
 `git merge main`
 `git stash pop`
 
 # If I had to fix something while working on another branch
+
 `git stash .`
 `git checkout -b [hotfix]`
 `git stash pop` or `git stash apply stash@{0}` safer without deleting it like `pop`
@@ -64,3 +66,7 @@ Clean up work trees:
 `git push`
 `git checkout [original branch]`
 `git pull origin main`
+
+# Delete remote branch
+
+`git push original --delete [branch name]`

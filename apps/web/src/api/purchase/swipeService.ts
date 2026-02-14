@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../core/types'
 
 type SwipeScheduleQueryRow = {
   id: string

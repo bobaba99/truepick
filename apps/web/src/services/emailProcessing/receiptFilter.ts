@@ -24,7 +24,6 @@ export function matchesNegativePatterns(email: ReceiptFilterEmail): boolean {
     /your\s+(package|order)\s+(has\s+)?(shipped|is\s+on\s+the\s+way)/,
     /tracking\s+(update|notification)/,
     /out\s+for\s+delivery/,
-    /delivered\s+to/,
     /shipment\s+(update|notification)/,
     /password\s+(reset|changed|updated)/,
     /account\s+(updated|settings|verification)/,
@@ -34,6 +33,24 @@ export function matchesNegativePatterns(email: ReceiptFilterEmail): boolean {
   ]
 
   return negativePatterns.some((pattern) => pattern.test(content))
+}
+
+/**
+ * Some providers (notably Uber Eats) include delivery/status wording inside valid receipts.
+ * This checks for strong receipt evidence so we don't reject those messages too early.
+ */
+function hasStrongReceiptEvidence(email: ReceiptFilterEmail): boolean {
+  const content = (email.subject + ' ' + email.textContent).toLowerCase()
+  const strongSignals = [
+    `here's your receipt`,
+    'thank you for your purchase',
+    'thanks for ordering',
+    'your order with uber eats',
+    'you ordered from',
+    'order #',
+  ]
+
+  return strongSignals.some((signal) => content.includes(signal))
 }
 
 /**
@@ -111,14 +128,6 @@ export function calculateReceiptConfidence(email: ReceiptFilterEmail): number {
  * Returns whether email should be sent to downstream parsing.
  */
 export function filterEmailForReceipt(email: ReceiptFilterEmail): FilterResult {
-  if (matchesNegativePatterns(email)) {
-    return {
-      shouldProcess: false,
-      confidence: 0,
-      rejectionReason: 'matches_negative_pattern',
-    }
-  }
-
   const priceConfidence = detectPricePatterns(email)
   if (priceConfidence === 0) {
     return {
@@ -129,6 +138,17 @@ export function filterEmailForReceipt(email: ReceiptFilterEmail): FilterResult {
   }
 
   const keywordConfidence = calculateReceiptConfidence(email)
+  if (
+    matchesNegativePatterns(email) &&
+    !(hasStrongReceiptEvidence(email) && priceConfidence >= 0.5 && keywordConfidence >= 0.4)
+  ) {
+    return {
+      shouldProcess: false,
+      confidence: 0,
+      rejectionReason: 'matches_negative_pattern',
+    }
+  }
+
   const overallConfidence = priceConfidence * PRICE_WEIGHT + keywordConfidence * KEYWORD_WEIGHT
 
   return {

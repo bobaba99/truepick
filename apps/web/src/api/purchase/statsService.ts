@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { Stats } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { Stats } from '../core/types'
 
 export async function getSwipeStats(userId: string): Promise<Stats> {
   const stats: Stats = {

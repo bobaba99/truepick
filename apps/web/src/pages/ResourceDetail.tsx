@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
-import type { ResourceRow } from '../api/types'
-import { getResourceBySlug } from '../api/resourceService'
+import type { ResourceRow } from '../api/core/types'
+import { getResourceBySlug } from '../api/resource/resourceService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
 
 const formatPublishedDate = (value: string | null): string | null => {

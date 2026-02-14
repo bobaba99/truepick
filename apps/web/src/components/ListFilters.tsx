@@ -1,4 +1,4 @@
-import { PURCHASE_CATEGORIES } from '../api/types'
+import { PURCHASE_CATEGORIES } from '../api/core/types'
 import type { FilterState } from './ListFilters.model'
 
 type ListFiltersProps = {

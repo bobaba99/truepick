@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { ResourceListItem } from '../api/types'
-import { getPublishedResources } from '../api/resourceService'
+import type { ResourceListItem } from '../api/core/types'
+import { getPublishedResources } from '../api/resource/resourceService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
 
 const formatPublishedDate = (value: string | null) => {

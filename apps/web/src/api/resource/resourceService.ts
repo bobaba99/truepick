@@ -1,5 +1,5 @@
-import { supabase } from './supabaseClient'
-import type { ResourceListItem, ResourceRow } from './types'
+import { supabase } from '../core/supabaseClient'
+import type { ResourceListItem, ResourceRow } from '../core/types'
 
 export async function getResourceBySlug(slug: string): Promise<ResourceRow | null> {
   const { data, error } = await supabase

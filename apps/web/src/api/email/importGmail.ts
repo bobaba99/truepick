@@ -12,7 +12,14 @@ import {
 } from './gmailClient'
 import { parseReceiptWithAI, type ExtractedReceipt } from './receiptParser'
 import { updateLastSync } from './emailConnectionService'
-import { supabase } from './supabaseClient'
+import { supabase } from '../core/supabaseClient'
+import {
+  extractCandidateOrderIds,
+  hasExistingPurchaseFingerprint,
+  getExistingOrderIds,
+  getProcessedEmailIds,
+  markEmailAsProcessed,
+} from './emailImportDedupService'
 import {
   startImportLog,
   logImport,
@@ -51,9 +58,10 @@ export type ImportResult = {
 /**
  * Import purchase receipts from Gmail
  * 1. Fetches recent emails matching receipt patterns
- * 2. Filters to likely receipts
- * 3. Parses with GPT to extract purchase data
- * 4. Creates purchases via add_purchase RPC (with deduplication)
+ * 2. Skips emails already processed in previous imports
+ * 3. Filters to likely receipts and pre-checks existing order IDs
+ * 4. Parses with GPT to extract purchase data
+ * 5. Creates purchases via add_purchase RPC (with deduplication)
  */
 export async function importGmailReceipts(
   accessToken: string,
@@ -101,6 +109,13 @@ export async function importGmailReceipts(
     return { imported: [], skipped: 0, errors: [], log }
   }
 
+  const provider = 'gmail' as const
+  let processedEmailIds = await getProcessedEmailIds(
+    userId,
+    provider,
+    messageHeaders.map((message) => message.id)
+  )
+
   let headerIndex = 0
 
   while (results.length < maxMessages && totalScanned < MAX_EMAILS_SCANNED) {
@@ -115,11 +130,26 @@ export async function importGmailReceipts(
       headerIndex = 0
 
       if (messageHeaders.length === 0) break
+
+      processedEmailIds = await getProcessedEmailIds(
+        userId,
+        provider,
+        messageHeaders.map((message) => message.id)
+      )
     }
 
     const header = messageHeaders[headerIndex]
     totalScanned++
     headerIndex++
+
+    if (processedEmailIds.has(header.id)) {
+      skipped++
+      logSkip({
+        emailId: header.id,
+        reason: 'already_processed_email_id',
+      })
+      continue
+    }
 
     try {
       // Get full message content
@@ -146,7 +176,44 @@ export async function importGmailReceipts(
           reason: filterResult.rejectionReason ?? 'unknown',
           confidence: filterResult.confidence,
         })
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
         continue
+      }
+
+      const candidateOrderIds = extractCandidateOrderIds(parsed.subject, parsed.textContent)
+      if (candidateOrderIds.length > 0) {
+        const existingOrderIds = await getExistingOrderIds(userId, candidateOrderIds)
+
+        if (existingOrderIds.size > 0) {
+          logFetchedMessage({
+            emailId: header.id,
+            from: parsed.from,
+            subject: parsed.subject,
+            date: parsed.date,
+            textContent: parsed.textContent,
+            filterResult,
+          })
+          skipped++
+          logSkip({
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            reason: 'existing_order_id_pre_ai',
+          })
+          await markProcessedEmailSafely({
+            userId,
+            provider,
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            errors,
+          })
+          continue
+        }
       }
 
       // Parse with AI - returns array of receipts (one per item)
@@ -181,13 +248,36 @@ export async function importGmailReceipts(
           emailSubject: parsed.subject,
           reason: 'llm_returned_empty',
         })
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
         continue
       }
+
+      let hitMessageImportLimit = false
 
       // Create purchases for each item in the receipt
       for (const receipt of receipts) {
         // Check if we've reached the max
-        if (results.length >= maxMessages) break
+        if (results.length >= maxMessages) {
+          hitMessageImportLimit = true
+          break
+        }
+
+        const fingerprintDuplicate = await hasExistingPurchaseFingerprint(userId, receipt)
+        if (fingerprintDuplicate) {
+          skipped++
+          logSkip({
+            emailId: header.id,
+            emailSubject: parsed.subject,
+            reason: 'duplicate_purchase_fingerprint',
+          })
+          continue
+        }
 
         // Create purchase via RPC (handles deduplication via order_id constraint)
         const { error, isDuplicate } = await createEmailPurchase(receipt)
@@ -228,6 +318,16 @@ export async function importGmailReceipts(
         })
       }
 
+      if (!hitMessageImportLimit) {
+        await markProcessedEmailSafely({
+          userId,
+          provider,
+          emailId: header.id,
+          emailSubject: parsed.subject,
+          errors,
+        })
+      }
+
       // Rate limiting: brief pause between API calls
       await sleep(100)
     } catch (err) {
@@ -249,6 +349,26 @@ export async function importGmailReceipts(
   return { imported: results, skipped, errors, log }
 }
 
+async function markProcessedEmailSafely(args: {
+  userId: string
+  provider: 'gmail' | 'outlook'
+  emailId: string
+  emailSubject?: string
+  errors: string[]
+}): Promise<void> {
+  try {
+    await markEmailAsProcessed(args.userId, args.provider, args.emailId)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    args.errors.push(`Failed to mark email ${args.emailId} as processed: ${message}`)
+    logError({
+      emailId: args.emailId,
+      emailSubject: args.emailSubject,
+      reason: `mark_processed_failed: ${message}`,
+    })
+  }
+}
+
 /**
  * Create a purchase from an extracted email receipt
  */
@@ -261,7 +381,7 @@ async function createEmailPurchase(
     p_vendor: receipt.vendor,
     p_category: receipt.category,
     p_purchase_date: receipt.purchase_date,
-    p_source: 'email',
+    p_source: 'email:gmail',
     p_verdict_id: null,
     p_is_past_purchase: true,
     p_past_purchase_outcome: null,
@@ -288,30 +408,7 @@ async function createEmailPurchase(
   return { error: null, isDuplicate: false }
 }
 
-/**
- * Check for existing purchases to avoid re-importing
- * Returns order_ids that already exist
- */
-export async function getExistingOrderIds(
-  userId: string,
-  orderIds: string[]
-): Promise<Set<string>> {
-  if (orderIds.length === 0) return new Set()
-
-  const { data, error } = await supabase
-    .from('purchases')
-    .select('order_id')
-    .eq('user_id', userId)
-    .in('order_id', orderIds)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return new Set(
-    (data ?? []).map((row) => row.order_id).filter((id): id is string => !!id)
-  )
-}
+export { getExistingOrderIds } from './emailImportDedupService'
 
 /**
  * Get import history for display
@@ -320,12 +417,12 @@ export async function getEmailImportStats(userId: string): Promise<{
   totalImported: number
   lastSyncDate: string | null
 }> {
-  // Count purchases from email source
+  // Count purchases from email source (matches 'email:gmail', 'email:outlook', and legacy 'email')
   const { count, error: countError } = await supabase
     .from('purchases')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('source', 'email')
+    .like('source', 'email%')
 
   if (countError) {
     throw new Error(countError.message)
@@ -347,6 +444,37 @@ export async function getEmailImportStats(userId: string): Promise<{
     totalImported: count ?? 0,
     lastSyncDate: connection?.last_sync ?? null,
   }
+}
+
+export type EmailImportedPurchase = {
+  id: string
+  title: string
+  price: number
+  vendor: string | null
+  category: string | null
+  purchase_date: string
+  source: string
+  created_at: string
+}
+
+/**
+ * Get all email-imported purchases for display
+ */
+export async function getEmailImportedPurchases(
+  userId: string
+): Promise<EmailImportedPurchase[]> {
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('id, title, price, vendor, category, purchase_date, source, created_at')
+    .eq('user_id', userId)
+    .like('source', 'email%')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as EmailImportedPurchase[]
 }
 
 function sleep(ms: number): Promise<void> {
