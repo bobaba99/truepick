@@ -113,3 +113,48 @@ export async function exchangeCodeForTokens(
     expiresAt,
   }
 }
+
+/**
+ * Refresh an expired access token using the stored refresh_token
+ * Returns new access_token, refresh_token (rotated), and expires_in
+ */
+export async function refreshOutlookToken(
+  clientId: string,
+  refreshToken: string
+): Promise<{
+  accessToken: string
+  refreshToken: string | null
+  expiresAt: Date | null
+}> {
+  const body = new URLSearchParams({
+    client_id: clientId,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    scope: OUTLOOK_SCOPES,
+  })
+
+  const response = await fetch(`${MS_AUTH_BASE}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(
+      error.error_description ?? error.error ?? 'Token refresh failed'
+    )
+  }
+
+  const data = await response.json()
+
+  const expiresAt = data.expires_in
+    ? new Date(Date.now() + data.expires_in * 1000)
+    : null
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token ?? null,
+    expiresAt,
+  }
+}

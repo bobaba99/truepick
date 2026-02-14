@@ -16,7 +16,7 @@ import {
   type ImportResult,
 } from '../api/importGmail'
 import { importOutlookReceipts } from '../api/importOutlook'
-import { startOutlookOAuth, exchangeCodeForTokens } from '../api/outlookAuth'
+import { startOutlookOAuth, exchangeCodeForTokens, refreshOutlookToken } from '../api/outlookAuth'
 
 type EmailSyncProps = {
   session: Session | null
@@ -180,13 +180,24 @@ export default function EmailSync({ session }: EmailSyncProps) {
     }
   }, [userId, loadConnectionData])
 
-  // Handle Outlook OAuth callback (auth code in URL query params)
+  // Handle Outlook OAuth callback (auth code or error in URL query params)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
     const state = params.get('state')
 
-    if (!code || state !== 'outlook_oauth' || !userId || !MICROSOFT_CLIENT_ID) return
+    if (state !== 'outlook_oauth') return
+
+    // Microsoft returns error params if user denies consent or auth fails
+    const oauthError = params.get('error')
+    if (oauthError) {
+      const errorDesc = params.get('error_description') ?? oauthError
+      window.history.replaceState(null, '', window.location.pathname)
+      setStatus({ type: 'error', message: `Outlook auth failed: ${errorDesc}` })
+      return
+    }
+
+    const code = params.get('code')
+    if (!code || !userId || !MICROSOFT_CLIENT_ID) return
 
     // Clear query params from URL
     window.history.replaceState(null, '', window.location.pathname)
@@ -236,12 +247,34 @@ export default function EmailSync({ session }: EmailSyncProps) {
   const handleImport = async () => {
     if (!userId || !connection) return
 
+    let accessToken = connection.encrypted_token
+
+    // If token is expired, try to refresh (Outlook only — Gmail uses implicit flow)
     if (isTokenExpired(connection)) {
-      setStatus({
-        type: 'error',
-        message: `Token expired. Please reconnect ${connection.provider === 'outlook' ? 'Outlook' : 'Gmail'}.`,
-      })
-      return
+      if (connection.provider === 'outlook' && connection.refresh_token && MICROSOFT_CLIENT_ID) {
+        try {
+          setStatus({ type: 'loading', message: 'Refreshing Outlook token...' })
+          const refreshed = await refreshOutlookToken(MICROSOFT_CLIENT_ID, connection.refresh_token)
+          await saveEmailConnection(userId, {
+            provider: 'outlook',
+            accessToken: refreshed.accessToken,
+            refreshToken: refreshed.refreshToken,
+            expiresAt: refreshed.expiresAt,
+          })
+          accessToken = refreshed.accessToken
+          loadConnectionData()
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Token refresh failed'
+          setStatus({ type: 'error', message: `Token expired and refresh failed: ${message}. Please reconnect Outlook.` })
+          return
+        }
+      } else {
+        setStatus({
+          type: 'error',
+          message: `Token expired. Please reconnect ${connection.provider === 'outlook' ? 'Outlook' : 'Gmail'}.`,
+        })
+        return
+      }
     }
 
     if (!OPENAI_API_KEY) {
@@ -259,7 +292,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
           : importGmailReceipts
 
       const result = await importFn(
-        connection.encrypted_token,
+        accessToken,
         userId,
         {
           maxMessages: 10,

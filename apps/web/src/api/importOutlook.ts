@@ -80,8 +80,10 @@ export async function importOutlookReceipts(
   // Fetch in batches: start with INITIAL_BATCH, then REFILL_BATCH until maxMessages hits
   const INITIAL_BATCH = 50
   const REFILL_BATCH = 25
+  const MAX_EMAILS_SCANNED = 500
 
   let totalFetched = 0
+  let totalScanned = 0
 
   // First batch
   let messageHeaders = await listMessagesFiltered(accessToken, sinceDays, INITIAL_BATCH)
@@ -94,7 +96,7 @@ export async function importOutlookReceipts(
 
   let headerIndex = 0
 
-  while (results.length < maxMessages) {
+  while (results.length < maxMessages && totalScanned < MAX_EMAILS_SCANNED) {
     // If we've exhausted current batch, fetch more using $skip
     if (headerIndex >= messageHeaders.length) {
       const nextBatch = await listMessagesFiltered(
@@ -108,6 +110,7 @@ export async function importOutlookReceipts(
     }
 
     const header = messageHeaders[headerIndex]
+    totalScanned++
     headerIndex++
 
     try {

@@ -84,9 +84,11 @@ export async function importGmailReceipts(
   // Fetch in batches: start with INITIAL_BATCH, then REFILL_BATCH until maxMessages hits
   const INITIAL_BATCH = 50
   const REFILL_BATCH = 25
+  const MAX_EMAILS_SCANNED = 500
 
   let pageToken: string | undefined
   let hasMoreMessages = true
+  let totalScanned = 0
 
   // First batch
   const firstResult = await listMessages(accessToken, query, INITIAL_BATCH)
@@ -101,7 +103,7 @@ export async function importGmailReceipts(
 
   let headerIndex = 0
 
-  while (results.length < maxMessages) {
+  while (results.length < maxMessages && totalScanned < MAX_EMAILS_SCANNED) {
     // If we've exhausted current batch, fetch more
     if (headerIndex >= messageHeaders.length) {
       if (!hasMoreMessages) break
@@ -116,6 +118,7 @@ export async function importGmailReceipts(
     }
 
     const header = messageHeaders[headerIndex]
+    totalScanned++
     headerIndex++
 
     try {
