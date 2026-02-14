@@ -57,15 +57,24 @@ export type ParsedEmail = {
 /**
  * List messages matching a search query
  */
+export type ListMessagesResult = {
+  messages: GmailMessageHeader[]
+  nextPageToken: string | null
+}
+
 export async function listMessages(
   accessToken: string,
   query: string,
-  maxResults: number = 100
-): Promise<GmailMessageHeader[]> {
+  maxResults: number = 100,
+  pageToken?: string
+): Promise<ListMessagesResult> {
   const params = new URLSearchParams({
     q: query,
     maxResults: maxResults.toString(),
   })
+  if (pageToken) {
+    params.set('pageToken', pageToken)
+  }
 
   const response = await fetch(
     `${GMAIL_API_BASE}/users/me/messages?${params}`,
@@ -82,7 +91,10 @@ export async function listMessages(
   }
 
   const data = await response.json()
-  return data.messages ?? []
+  return {
+    messages: data.messages ?? [],
+    nextPageToken: data.nextPageToken ?? null,
+  }
 }
 
 /**

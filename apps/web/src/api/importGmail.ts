@@ -81,19 +81,42 @@ export async function importGmailReceipts(
   // Build Gmail search query
   const query = buildReceiptQuery(sinceDays)
 
-  // List candidate messages (fetch more than needed for filtering)
-  // TODO: optimize number of messages fetched
-  const messageHeaders = await listMessages(accessToken, query, maxMessages * 3)
+  // Fetch in batches: start with INITIAL_BATCH, then REFILL_BATCH until maxMessages hits
+  const INITIAL_BATCH = 50
+  const REFILL_BATCH = 25
+
+  let pageToken: string | undefined
+  let hasMoreMessages = true
+
+  // First batch
+  const firstResult = await listMessages(accessToken, query, INITIAL_BATCH)
+  let messageHeaders = firstResult.messages
+  pageToken = firstResult.nextPageToken ?? undefined
+  hasMoreMessages = !!pageToken
 
   if (messageHeaders.length === 0) {
     const log = endImportLog()
     return { imported: [], skipped: 0, errors: [], log }
   }
 
-  // Process messages until we have enough receipts
-  let processedCount = 0
-  for (const header of messageHeaders) {
-    if (results.length >= maxMessages) break
+  let headerIndex = 0
+
+  while (results.length < maxMessages) {
+    // If we've exhausted current batch, fetch more
+    if (headerIndex >= messageHeaders.length) {
+      if (!hasMoreMessages) break
+
+      const nextResult = await listMessages(accessToken, query, REFILL_BATCH, pageToken)
+      messageHeaders = nextResult.messages
+      pageToken = nextResult.nextPageToken ?? undefined
+      hasMoreMessages = !!pageToken
+      headerIndex = 0
+
+      if (messageHeaders.length === 0) break
+    }
+
+    const header = messageHeaders[headerIndex]
+    headerIndex++
 
     try {
       // Get full message content
@@ -202,12 +225,8 @@ export async function importGmailReceipts(
         })
       }
 
-      processedCount++
-
       // Rate limiting: brief pause between API calls
-      if (processedCount < messageHeaders.length) {
-        await sleep(100)
-      }
+      await sleep(100)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       errors.push(`Message ${header.id}: ${message}`)

@@ -34,6 +34,10 @@
     "concurrently": "^9.2.1"
   },
   "dependencies": {
-    "openai": "^6.21.0"
+    "@azure/identity": "^4.13.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "isomorphic-fetch": "^3.0.0",
+    "openai": "^6.21.0",
+    "readline-sync": "^1.4.10"
   }
 }

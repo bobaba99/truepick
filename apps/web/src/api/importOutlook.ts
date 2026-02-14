@@ -77,22 +77,38 @@ export async function importOutlookReceipts(
   const errors: string[] = []
   let skipped = 0
 
-  // List candidate messages (fetch more than needed for filtering)
-  const messageHeaders = await listMessagesFiltered(
-    accessToken,
-    sinceDays,
-    maxMessages * 5
-  )
+  // Fetch in batches: start with INITIAL_BATCH, then REFILL_BATCH until maxMessages hits
+  const INITIAL_BATCH = 50
+  const REFILL_BATCH = 25
+
+  let totalFetched = 0
+
+  // First batch
+  let messageHeaders = await listMessagesFiltered(accessToken, sinceDays, INITIAL_BATCH)
+  totalFetched += messageHeaders.length
 
   if (messageHeaders.length === 0) {
     const log = endImportLog()
     return { imported: [], skipped: 0, errors: [], log }
   }
 
-  // Process messages until we have enough receipts
-  let processedCount = 0
-  for (const header of messageHeaders) {
-    if (results.length >= maxMessages) break
+  let headerIndex = 0
+
+  while (results.length < maxMessages) {
+    // If we've exhausted current batch, fetch more using $skip
+    if (headerIndex >= messageHeaders.length) {
+      const nextBatch = await listMessagesFiltered(
+        accessToken, sinceDays, REFILL_BATCH, totalFetched
+      )
+      messageHeaders = nextBatch
+      totalFetched += nextBatch.length
+      headerIndex = 0
+
+      if (messageHeaders.length === 0) break
+    }
+
+    const header = messageHeaders[headerIndex]
+    headerIndex++
 
     try {
       // Get full message content
@@ -201,12 +217,8 @@ export async function importOutlookReceipts(
         })
       }
 
-      processedCount++
-
       // Rate limiting: brief pause between API calls
-      if (processedCount < messageHeaders.length) {
-        await sleep(100)
-      }
+      await sleep(100)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       errors.push(`Message ${header.id}: ${message}`)

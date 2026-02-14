@@ -43,3 +43,9 @@ build/
 *.log
 logs/
 apps/web/src/api/debug/
+
+# Skills
+security-guidance-skill/
+code-review-skill/
+
+apps/web/docs/

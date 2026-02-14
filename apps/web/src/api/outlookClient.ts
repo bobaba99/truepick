@@ -51,13 +51,17 @@ export type ParsedEmail = {
 export async function listMessages(
   accessToken: string,
   searchQuery: string,
-  maxResults: number = 100
+  maxResults: number = 100,
+  skip: number = 0
 ): Promise<OutlookMessageHeader[]> {
   const params = new URLSearchParams({
     $search: `"${searchQuery}"`,
     $top: maxResults.toString(),
     $select: 'id',
   })
+  if (skip > 0) {
+    params.set('$skip', skip.toString())
+  }
 
   const response = await fetch(
     `${GRAPH_API_BASE}/me/messages?${params}`,
@@ -187,21 +191,21 @@ export function buildDateFilter(sinceDays: number = 90): string {
 export async function listMessagesFiltered(
   accessToken: string,
   sinceDays: number = 90,
-  maxResults: number = 100
+  maxResults: number = 100,
+  skip: number = 0
 ): Promise<OutlookMessageHeader[]> {
   const searchQuery = buildReceiptQuery()
   const dateFilter = buildDateFilter(sinceDays)
 
-  // Note: Microsoft Graph doesn't allow $search and $filter together on
-  // the messages endpoint in all cases. We use $search for keywords and
-  // handle date filtering in post-processing if needed.
-  // However, $filter on receivedDateTime works alongside $search in most tenants.
   const params = new URLSearchParams({
     $search: `"${searchQuery}"`,
     $filter: dateFilter,
     $top: maxResults.toString(),
     $select: 'id',
   })
+  if (skip > 0) {
+    params.set('$skip', skip.toString())
+  }
 
   const response = await fetch(
     `${GRAPH_API_BASE}/me/messages?${params}`,
@@ -216,7 +220,7 @@ export async function listMessagesFiltered(
 
   // If $search + $filter fails, fall back to $search only
   if (!response.ok) {
-    return listMessages(accessToken, searchQuery, maxResults)
+    return listMessages(accessToken, searchQuery, maxResults, skip)
   }
 
   const data = await response.json()
