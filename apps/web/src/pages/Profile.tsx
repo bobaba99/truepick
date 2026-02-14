@@ -1454,7 +1454,10 @@ export default function Profile({ session }: ProfileProps) {
                   <button
                     type="button"
                     className="import-option-btn outlook"
-                    onClick={() => alert('Outlook integration coming soon!')}
+                    onClick={() => {
+                      setEmailImportModalOpen(false)
+                      navigate('/email-sync?provider=outlook')
+                    }}
                   >
                     <OutlookLogo className="import-logo" />
                     <span className="import-label">Connect Outlook</span>

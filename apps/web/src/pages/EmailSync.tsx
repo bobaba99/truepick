@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
-import { GmailLogo } from '../components/EmailIcons'
+import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
 import {
   getEmailConnection,
   saveEmailConnection,
@@ -15,6 +15,8 @@ import {
   downloadMessagesMarkdown,
   type ImportResult,
 } from '../api/importGmail'
+import { importOutlookReceipts } from '../api/importOutlook'
+import { startOutlookOAuth, exchangeCodeForTokens } from '../api/outlookAuth'
 
 type EmailSyncProps = {
   session: Session | null
@@ -25,11 +27,14 @@ type Status = {
   message?: string
 }
 
-// Gmail OAuth configuration
+// OAuth configuration
 const GMAIL_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly'
+const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID ?? ''
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? ''
 const IMPORT_RESULT_STORAGE_PREFIX = 'email-sync-import-result'
+
+type EmailProvider = 'gmail' | 'outlook'
 
 const getImportResultStorageKey = (userId: string) =>
   `${IMPORT_RESULT_STORAGE_PREFIX}:${userId}`
@@ -41,6 +46,10 @@ export default function EmailSync({ session }: EmailSyncProps) {
   const [hasHydratedImportResult, setHasHydratedImportResult] = useState(false)
   const [stats, setStats] = useState<{ totalImported: number; lastSyncDate: string | null } | null>(null)
   const [isImporting, setIsImporting] = useState(false)
+  const [provider, setProvider] = useState<EmailProvider>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('provider') === 'outlook' ? 'outlook' : 'gmail'
+  })
 
   const userId = session?.user?.id
 
@@ -122,6 +131,20 @@ export default function EmailSync({ session }: EmailSyncProps) {
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
   }, [])
 
+  // Initialize Outlook OAuth
+  const handleConnectOutlook = useCallback(async () => {
+    if (!MICROSOFT_CLIENT_ID) {
+      setStatus({ type: 'error', message: 'Microsoft Client ID not configured' })
+      return
+    }
+    try {
+      await startOutlookOAuth(MICROSOFT_CLIENT_ID)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start OAuth'
+      setStatus({ type: 'error', message })
+    }
+  }, [])
+
   // Handle OAuth callback (access token in URL hash)
   useEffect(() => {
     const hash = window.location.hash
@@ -157,6 +180,43 @@ export default function EmailSync({ session }: EmailSyncProps) {
     }
   }, [userId, loadConnectionData])
 
+  // Handle Outlook OAuth callback (auth code in URL query params)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+
+    if (!code || state !== 'outlook_oauth' || !userId || !MICROSOFT_CLIENT_ID) return
+
+    // Clear query params from URL
+    window.history.replaceState(null, '', window.location.pathname)
+
+    setStatus({ type: 'loading', message: 'Exchanging Outlook token...' })
+
+    exchangeCodeForTokens(MICROSOFT_CLIENT_ID, code)
+      .then(({ accessToken, refreshToken, expiresAt }) =>
+        saveEmailConnection(userId, {
+          provider: 'outlook',
+          accessToken,
+          refreshToken,
+          expiresAt,
+        })
+      )
+      .then(({ error }) => {
+        if (error) {
+          setStatus({ type: 'error', message: error })
+        } else {
+          setProvider('outlook')
+          setStatus({ type: 'success', message: 'Outlook connected successfully!' })
+          loadConnectionData()
+        }
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Token exchange failed'
+        setStatus({ type: 'error', message })
+      })
+  }, [userId, loadConnectionData])
+
   // Disconnect Gmail
   const handleDisconnect = async () => {
     if (!userId) return
@@ -177,7 +237,10 @@ export default function EmailSync({ session }: EmailSyncProps) {
     if (!userId || !connection) return
 
     if (isTokenExpired(connection)) {
-      setStatus({ type: 'error', message: 'Token expired. Please reconnect Gmail.' })
+      setStatus({
+        type: 'error',
+        message: `Token expired. Please reconnect ${connection.provider === 'outlook' ? 'Outlook' : 'Gmail'}.`,
+      })
       return
     }
 
@@ -190,7 +253,12 @@ export default function EmailSync({ session }: EmailSyncProps) {
     setStatus({ type: 'loading', message: 'Scanning emails for receipts...' })
 
     try {
-      const result = await importGmailReceipts(
+      const importFn =
+        connection.provider === 'outlook'
+          ? importOutlookReceipts
+          : importGmailReceipts
+
+      const result = await importFn(
         connection.encrypted_token,
         userId,
         {
@@ -205,7 +273,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
         type: 'success',
         message: `Imported ${result.imported.length} receipts`,
       })
-      loadConnectionData() // Refresh stats
+      loadConnectionData()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed'
       setStatus({ type: 'error', message })
@@ -223,6 +291,24 @@ export default function EmailSync({ session }: EmailSyncProps) {
       </div>
 
       <GlassCard className="email-sync-container">
+        <div className="provider-tabs">
+          <button
+            className={`provider-tab ${provider === 'gmail' ? 'active' : ''}`}
+            onClick={() => setProvider('gmail')}
+            type="button"
+          >
+            <GmailLogo className="tab-icon" />
+            Gmail
+          </button>
+          <button
+            className={`provider-tab ${provider === 'outlook' ? 'active' : ''}`}
+            onClick={() => setProvider('outlook')}
+            type="button"
+          >
+            <OutlookLogo className="tab-icon" />
+            Outlook
+          </button>
+        </div>
         <div className="dashboard-grid">
           {/* Connection Card */}
           <div className="content-panel">
@@ -242,8 +328,12 @@ export default function EmailSync({ session }: EmailSyncProps) {
               {isConnected ? (
                 <div className="connected-status">
                   <div className="provider-info">
-                    <GmailLogo className="provider-logo" />
-                    <span>Gmail Connected</span>
+                    {connection.provider === 'outlook' ? (
+                      <OutlookLogo className="provider-logo" />
+                    ) : (
+                      <GmailLogo className="provider-logo" />
+                    )}
+                    <span>{connection.provider === 'outlook' ? 'Outlook' : 'Gmail'} Connected</span>
                   </div>
                   <div className="connection-actions">
                     <LiquidButton
@@ -264,6 +354,16 @@ export default function EmailSync({ session }: EmailSyncProps) {
                     </LiquidButton>
                   </div>
                 </div>
+              ) : provider === 'outlook' ? (
+                <LiquidButton
+                  className="primary"
+                  onClick={handleConnectOutlook}
+                  type="button"
+                  disabled={!session}
+                >
+                  <OutlookLogo className="button-icon" />
+                  Connect Outlook
+                </LiquidButton>
               ) : (
                 <LiquidButton
                   className="primary"
@@ -366,13 +466,23 @@ export default function EmailSync({ session }: EmailSyncProps) {
             <h3>How to revoke access</h3>
             <p>
               Click &quot;Disconnect&quot; above, or visit your{' '}
-              <a
-                href="https://myaccount.google.com/permissions"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Google Account permissions
-              </a>{' '}
+              {provider === 'outlook' ? (
+                <a
+                  href="https://account.live.com/consent/Manage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Microsoft Account permissions
+                </a>
+              ) : (
+                <a
+                  href="https://myaccount.google.com/permissions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Google Account permissions
+                </a>
+              )}{' '}
               to revoke access at any time.
             </p>
           </div>
