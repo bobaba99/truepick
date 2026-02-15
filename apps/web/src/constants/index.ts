@@ -59,6 +59,9 @@ export type {
   UserValueRow,
   OnboardingAnswers,
   UserValueType,
+  UserPreferences,
+  ThemeMode,
+  HoldDurationHours,
 } from './userTypes'
 export { USER_VALUE_DESCRIPTIONS } from './userTypes'
 

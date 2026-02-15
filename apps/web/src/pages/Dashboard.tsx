@@ -17,12 +17,15 @@ import {
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import EvaluatingModal from '../components/EvaluatingModal'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
+import { useUserFormatting, useUserPreferences } from '../preferences/UserPreferencesContext'
 
 type DashboardProps = {
   session: Session | null
 }
 
 export default function Dashboard({ session }: DashboardProps) {
+  const { preferences } = useUserPreferences()
+  const { formatCurrency, formatDateTime } = useUserFormatting()
   const [stats, setStats] = useState<Stats>({
     swipesCompleted: 0,
     regretRate: 0,
@@ -276,7 +279,7 @@ export default function Dashboard({ session }: DashboardProps) {
                       <span className="verdict-title">{verdict.candidate_title}</span>
                       <span className="verdict-outcome">
                         {verdict.predicted_outcome === 'buy' && '✓ Buy'}
-                        {verdict.predicted_outcome === 'hold' && '⏸ Hold for 24h'}
+                        {verdict.predicted_outcome === 'hold' && `⏸ Hold for ${preferences.hold_duration_hours}h`}
                         {verdict.predicted_outcome === 'skip' && '✗ Skip'}
                         {verdict.scoring_model === 'heuristic_fallback' && (
                           <span className="verdict-fallback-badge">Pattern-based</span>
@@ -285,13 +288,13 @@ export default function Dashboard({ session }: DashboardProps) {
                     </div>
                     {verdict.candidate_price && (
                       <span className="verdict-price">
-                        ${verdict.candidate_price.toFixed(2)}
+                        {formatCurrency(verdict.candidate_price)}
                       </span>
                     )}
                     {verdict.hold_release_at && (
                       <span className="verdict-hold">
                         Hold expires:{' '}
-                        {new Date(verdict.hold_release_at).toLocaleString()}
+                        {formatDateTime(verdict.hold_release_at)}
                       </span>
                     )}
                     <div className="verdict-meta">
@@ -347,7 +350,7 @@ export default function Dashboard({ session }: DashboardProps) {
                         onClick={() => handleVerdictDecision(verdict.id, 'hold')}
                         disabled={verdictSavingId === verdict.id || verdictRegeneratingId !== null}
                       >
-                        Hold 24h
+                        Hold {preferences.hold_duration_hours}h
                       </LiquidButton>
                       <LiquidButton
                         type="button"

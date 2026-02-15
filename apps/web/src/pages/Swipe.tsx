@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../api/core/types'
 import { getUnratedPurchases, createSwipe, deleteSwipe } from '../api/purchase/swipeService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
+import { useUserFormatting } from '../preferences/UserPreferencesContext'
 
 type SwipeProps = {
   session: Session | null
@@ -141,6 +142,7 @@ function SwipeableQueueCard({
 }
 
 export default function Swipe({ session }: SwipeProps) {
+  const { formatCurrency, formatDate } = useUserFormatting()
   const [purchases, setPurchases] = useState<SwipeQueueItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -686,7 +688,7 @@ export default function Swipe({ session }: SwipeProps) {
                 )}
               </div>
               <span className="swipe-price">
-                ${Number(currentPurchase.price).toFixed(2)}
+                {formatCurrency(Number(currentPurchase.price))}
               </span>
               {currentPurchase.vendor && (
                 <span className="swipe-vendor">{currentPurchase.vendor}</span>
@@ -711,12 +713,12 @@ export default function Swipe({ session }: SwipeProps) {
                         )}
                         <span>
                           Considered:{' '}
-                          {new Date(currentPurchase.purchase_date).toLocaleDateString()}
+                          {formatDate(currentPurchase.purchase_date)}
                         </span>
                         {currentItem && (
                           <span>
                             Scheduled:{' '}
-                            {new Date(currentItem.scheduled_for).toLocaleDateString()}
+                            {formatDate(currentItem.scheduled_for)}
                           </span>
                         )}
                       </div>

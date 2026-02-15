@@ -1,8 +1,19 @@
 import { supabase } from '../core/supabaseClient'
-import type { OnboardingAnswers, PurchaseInput, ScoreExplanation, VendorMatch } from '../core/types'
+import type {
+  OnboardingAnswers,
+  PurchaseInput,
+  ScoreExplanation,
+  UserPreferences,
+  VendorMatch,
+} from '../core/types'
 import { getEmbeddings } from './embeddingService'
 import { cosineSimilarity } from '../core/utils'
 import { buildScore } from './verdictScoring'
+import { normalizeUserPreferences } from '../../utils/userPreferences'
+import { formatCurrencyAmount } from '../../utils/formatters'
+
+const isMissingPreferencesColumnError = (message: string | undefined) =>
+  Boolean(message && /column .*preferences.* does not exist/i.test(message))
 
 type PurchaseWithSwipe = {
   id: string
@@ -359,16 +370,29 @@ export async function retrieveRecentPurchases(
 }
 
 export async function retrieveUserProfileContext(userId: string): Promise<string> {
-  const { data: profile, error: profileError } = await supabase
+  const { data, error } = await supabase
     .from('users')
-    .select('profile_summary, onboarding_answers, weekly_fun_budget')
+    .select('profile_summary, onboarding_answers, weekly_fun_budget, preferences')
     .eq('id', userId)
     .maybeSingle()
 
+  let profile = data
+  let profileError = error
+  if (profileError && isMissingPreferencesColumnError(profileError.message)) {
+    const { data: legacyProfile, error: legacyError } = await supabase
+      .from('users')
+      .select('profile_summary, onboarding_answers, weekly_fun_budget')
+      .eq('id', userId)
+      .maybeSingle()
+    profile = legacyProfile ? { ...legacyProfile, preferences: null } : null
+    profileError = legacyError
+  }
+
   const summary = profile?.profile_summary?.trim()
+  const preferences = normalizeUserPreferences((profile?.preferences as UserPreferences | null) ?? null)
   const budget =
     profile?.weekly_fun_budget !== null && profile?.weekly_fun_budget !== undefined
-      ? `$${profile.weekly_fun_budget.toFixed(2)}`
+      ? formatCurrencyAmount(profile.weekly_fun_budget, preferences)
       : null
 
   const contextParts: string[] = []

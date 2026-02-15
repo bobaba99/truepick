@@ -18,6 +18,7 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import './styles/App.css'
 import { CustomCursor, useGSAPLoader, LiquidButton, VolumetricInput } from './components/Kinematics'
+import { UserPreferencesProvider } from './preferences/UserPreferencesContext'
 
 type AuthMode = 'sign_in' | 'sign_up'
 
@@ -330,153 +331,155 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="page">
-        {gsapLoaded && <CustomCursor />}
-        <header className={`topbar${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
-          <div className="brand">TruePick</div>
-          <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
-            {session && (
-              <NavLink to="/" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-                Dashboard
+      <UserPreferencesProvider session={session}>
+        <div className="page">
+          {gsapLoaded && <CustomCursor />}
+          <header className={`topbar${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
+            <div className="brand">TruePick</div>
+            <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
+              {session && (
+                <NavLink to="/" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  Dashboard
+                </NavLink>
+              )}
+              {session && (
+                <NavLink to="/swipe" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  Swipe
+                </NavLink>
+              )}
+              {session && (
+                <NavLink to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  Profile
+                </NavLink>
+              )}
+              {session && isAdminUser && (
+                <NavLink to="/admin/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                  Admin
+                </NavLink>
+              )}
+              <NavLink to="/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                Resources
               </NavLink>
-            )}
-            {session && (
-              <NavLink to="/swipe" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-                Swipe
+              <NavLink to="/about" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                About
               </NavLink>
-            )}
-            {session && (
-              <NavLink to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-                Profile
+              <NavLink to="/support" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                Support
               </NavLink>
-            )}
-            {session && isAdminUser && (
-              <NavLink to="/admin/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-                Admin
-              </NavLink>
-            )}
-            <NavLink to="/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              Resources
-            </NavLink>
-            <NavLink to="/about" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              About
-            </NavLink>
-            <NavLink to="/support" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-              Support
-            </NavLink>
-          </nav>
-          <div className="top-actions">
-            {session ? (
-              <>
-                <div className="session-chip session-chip--desktop">
-                  <span className="session-label">Signed in</span>
-                  <span className="session-email">{session.user.email}</span>
-                  <LiquidButton
-                    className="ghost"
-                    type="button"
-                    onClick={handleSignOut}
-                    disabled={loading}
-                    data-cursor="expand"
-                  >
-                    Sign out
-                  </LiquidButton>
-                </div>
-                <div className="session-chip session-chip--mobile">
-                  <span className="avatar-placeholder" aria-label="User profile">
-                    {session.user.email?.charAt(0).toUpperCase() ?? '?'}
-                  </span>
-                  <LiquidButton
-                    className="ghost"
-                    type="button"
-                    onClick={handleSignOut}
-                    disabled={loading}
-                    data-cursor="expand"
-                  >
-                    Sign out
-                  </LiquidButton>
-                </div>
-              </>
-            ) : (
-              <span className="hint">Start with email + password</span>
-            )}
-          </div>
-          <button
-            className="mobile-menu-toggle"
-            type="button"
-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileMenuOpen}
-            onClick={() => setMobileMenuOpen((open) => !open)}
-          >
-            <span className={`hamburger${mobileMenuOpen ? ' hamburger--open' : ''}`} />
-          </button>
-        </header>
-
-        <main className="content">
-          {sessionLoading ? (
-            <div className="session-loading">
-              <div className="eval-spinner" />
+            </nav>
+            <div className="top-actions">
+              {session ? (
+                <>
+                  <div className="session-chip session-chip--desktop">
+                    <span className="session-label">Signed in</span>
+                    <span className="session-email">{session.user.email}</span>
+                    <LiquidButton
+                      className="ghost"
+                      type="button"
+                      onClick={handleSignOut}
+                      disabled={loading}
+                      data-cursor="expand"
+                    >
+                      Sign out
+                    </LiquidButton>
+                  </div>
+                  <div className="session-chip session-chip--mobile">
+                    <span className="avatar-placeholder" aria-label="User profile">
+                      {session.user.email?.charAt(0).toUpperCase() ?? '?'}
+                    </span>
+                    <LiquidButton
+                      className="ghost"
+                      type="button"
+                      onClick={handleSignOut}
+                      disabled={loading}
+                      data-cursor="expand"
+                    >
+                      Sign out
+                    </LiquidButton>
+                  </div>
+                </>
+              ) : (
+                <span className="hint">Start with email + password</span>
+              )}
             </div>
-          ) : (
-          <Routes>
-            <Route
-              path="/auth"
-              element={
-                <PublicOnly session={session}>
-                  <AuthRoute
-                    session={session}
-                    authMode={authMode}
-                    headline={headline}
-                    status={status}
-                    loading={loading}
-                    email={email}
-                    password={password}
-                    onAuth={handleAuth}
-                    onEmailChange={setEmail}
-                    onPasswordChange={setPassword}
-                    onToggleMode={() =>
-                      setAuthMode(authMode === 'sign_in' ? 'sign_up' : 'sign_in')
+            <button
+              className="mobile-menu-toggle"
+              type="button"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((open) => !open)}
+            >
+              <span className={`hamburger${mobileMenuOpen ? ' hamburger--open' : ''}`} />
+            </button>
+          </header>
+
+          <main className="content">
+            {sessionLoading ? (
+              <div className="session-loading">
+                <div className="eval-spinner" />
+              </div>
+            ) : (
+            <Routes>
+              <Route
+                path="/auth"
+                element={
+                  <PublicOnly session={session}>
+                    <AuthRoute
+                      session={session}
+                      authMode={authMode}
+                      headline={headline}
+                      status={status}
+                      loading={loading}
+                      email={email}
+                      password={password}
+                      onAuth={handleAuth}
+                      onEmailChange={setEmail}
+                      onPasswordChange={setPassword}
+                      onToggleMode={() =>
+                        setAuthMode(authMode === 'sign_in' ? 'sign_up' : 'sign_in')
+                      }
+                    />
+                  </PublicOnly>
+                }
+              />
+              <Route element={<AppShell />}>
+                <Route path="/resources" element={<Resources />} />
+                <Route path="/resources/:slug" element={<ResourceDetail />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/contact-us" element={<Contact />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/email-sync" element={<EmailSync session={session} />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+              </Route>
+
+              <Route element={<RequireAuth session={session} />}>
+                <Route element={<AppShell />}>
+                  <Route index element={<Dashboard session={session} />} />
+                  <Route path="swipe" element={<Swipe session={session} />} />
+                  <Route path="profile" element={<Profile session={session} />} />
+                  <Route
+                    path="admin/resources"
+                    element={
+                      isAdminUser
+                        ? <AdminResources session={session} />
+                        : <Navigate to="/" replace />
                     }
                   />
-                </PublicOnly>
-              }
-            />
-            <Route element={<AppShell />}>
-              <Route path="/resources" element={<Resources />} />
-              <Route path="/resources/:slug" element={<ResourceDetail />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/contact-us" element={<Contact />} />
-              <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/email-sync" element={<EmailSync session={session} />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-            </Route>
-
-            <Route element={<RequireAuth session={session} />}>
-              <Route element={<AppShell />}>
-                <Route index element={<Dashboard session={session} />} />
-                <Route path="swipe" element={<Swipe session={session} />} />
-                <Route path="profile" element={<Profile session={session} />} />
-                <Route
-                  path="admin/resources"
-                  element={
-                    isAdminUser
-                      ? <AdminResources session={session} />
-                      : <Navigate to="/" replace />
-                  }
-                />
+                </Route>
               </Route>
-            </Route>
 
-            <Route
-              path="*"
-              element={<Navigate to={session ? '/' : '/auth'} replace />}
-            />
-          </Routes>
-          )}
-        </main>
-      </div>
+              <Route
+                path="*"
+                element={<Navigate to={session ? '/' : '/auth'} replace />}
+              />
+            </Routes>
+            )}
+          </main>
+        </div>
+      </UserPreferencesProvider>
     </BrowserRouter>
   )
 }

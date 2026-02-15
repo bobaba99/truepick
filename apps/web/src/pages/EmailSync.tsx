@@ -19,6 +19,7 @@ import {
 } from '../api/email/importGmail'
 import { importOutlookReceipts } from '../api/email/importOutlook'
 import { startOutlookOAuth, exchangeCodeForTokens, refreshOutlookToken } from '../api/email/outlookAuth'
+import { useUserFormatting } from '../preferences/UserPreferencesContext'
 
 type EmailSyncProps = {
   session: Session | null
@@ -49,6 +50,7 @@ const getProviderFromSource = (source: string): EmailProvider | null => {
 }
 
 export default function EmailSync({ session }: EmailSyncProps) {
+  const { formatCurrency, formatDate } = useUserFormatting()
   const [connection, setConnection] = useState<EmailConnectionRow | null>(null)
   const [status, setStatus] = useState<Status>({ type: 'idle' })
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -478,7 +480,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
                 <p>
                   <strong>{stats.totalImported}</strong> receipts imported
                   {stats.lastSyncDate && (
-                    <> · Last sync: {new Date(stats.lastSyncDate).toLocaleDateString()}</>
+                    <> · Last sync: {formatDate(stats.lastSyncDate)}</>
                   )}
                 </p>
               </div>
@@ -523,9 +525,9 @@ export default function EmailSync({ session }: EmailSyncProps) {
                         </span>
                         <span className="item-title">{item.title}</span>
                         <span className="item-vendor">{item.vendor ?? ''}</span>
-                        <span className="item-price">${item.price.toFixed(2)}</span>
+                        <span className="item-price">{formatCurrency(item.price)}</span>
                         <span className="item-date">
-                          {new Date(item.purchase_date).toLocaleDateString()}
+                          {formatDate(item.purchase_date)}
                         </span>
                       </div>
                     )

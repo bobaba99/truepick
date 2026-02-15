@@ -3,6 +3,7 @@ import type {
   EvaluationResult,
   OnboardingAnswers,
   PurchaseInput,
+  UserPreferences,
   UserDecision,
   VerdictOutcome,
   VerdictRow,
@@ -18,6 +19,57 @@ import { buildScore, computeFinancialStrain } from './verdictScoring'
 import { clamp01 } from '../core/utils'
 import { evaluateWithFallback, evaluateWithLlm, type EvaluationContext } from './verdictLLM'
 import { logger } from '../core/logger'
+import { normalizeUserPreferences } from '../../utils/userPreferences'
+import { formatCurrencyAmount } from '../../utils/formatters'
+
+const isMissingPreferencesColumnError = (message: string | undefined) =>
+  Boolean(message && /column .*preferences.* does not exist/i.test(message))
+
+const resolveUserPreferences = async (userId: string): Promise<UserPreferences> => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('preferences')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error && isMissingPreferencesColumnError(error.message)) {
+    return normalizeUserPreferences(null)
+  }
+
+  return normalizeUserPreferences((data?.preferences as UserPreferences | null) ?? null)
+}
+
+const syncHoldReminderTimer = async (
+  userId: string,
+  verdictId: string,
+  expiresAt: string | null,
+  remindersEnabled: boolean,
+): Promise<string | null> => {
+  const { error: deleteError } = await supabase
+    .from('hold_timers')
+    .delete()
+    .eq('user_id', userId)
+    .eq('verdict_id', verdictId)
+
+  if (deleteError) {
+    return deleteError.message
+  }
+
+  if (!expiresAt || !remindersEnabled) {
+    return null
+  }
+
+  const { error: insertError } = await supabase
+    .from('hold_timers')
+    .insert({
+      user_id: userId,
+      verdict_id: verdictId,
+      expires_at: expiresAt,
+      notified: false,
+    })
+
+  return insertError?.message ?? null
+}
 
 const normalizeLikert = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) return 0
@@ -99,8 +151,10 @@ export async function updateVerdictDecision(
   verdictId: string,
   decision: UserDecision
 ): Promise<{ error: string | null; isDuplicate: boolean }> {
+  const preferences = await resolveUserPreferences(userId)
+  const holdDurationMs = preferences.hold_duration_hours * 60 * 60 * 1000
   const userHoldUntil =
-    decision === 'hold' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+    decision === 'hold' ? new Date(Date.now() + holdDurationMs).toISOString() : null
 
   const { data: verdict, error: fetchError } = await supabase
     .from('verdicts')
@@ -188,6 +242,16 @@ export async function updateVerdictDecision(
     }
   }
 
+  const timerError = await syncHoldReminderTimer(
+    userId,
+    verdictId,
+    userHoldUntil,
+    preferences.hold_reminders_enabled,
+  )
+  if (timerError) {
+    return { error: timerError, isDuplicate: false }
+  }
+
   return { error: null, isDuplicate: false }
 }
 
@@ -222,10 +286,12 @@ export async function submitVerdict(
   evaluation: EvaluationResult,
   existingVerdictId?: string
 ): Promise<{ data: VerdictRow | null; error: string | null }> {
+  const preferences = await resolveUserPreferences(userId)
   const vendorMatch = await retrieveVendorMatch(input)
+  const holdDurationMs = preferences.hold_duration_hours * 60 * 60 * 1000
   const holdReleaseAt =
     evaluation.outcome === 'hold'
-      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      ? new Date(Date.now() + holdDurationMs).toISOString()
       : null
 
   const verdictPayload = {
@@ -236,6 +302,8 @@ export async function submitVerdict(
     reasoning: evaluation.reasoning,
     hold_release_at: holdReleaseAt,
   }
+
+  let verdictId = existingVerdictId ?? null
 
   if (existingVerdictId) {
     const { error } = await supabase
@@ -252,19 +320,39 @@ export async function submitVerdict(
       return { data: null, error: error.message }
     }
   } else {
-    const { error } = await supabase.from('verdicts').insert({
-      user_id: userId,
-      candidate_title: input.title,
-      candidate_price: input.price,
-      candidate_category: input.category,
-      candidate_vendor: input.vendor,
-      justification: input.justification,
-      ...verdictPayload,
-    })
+    const { data: insertedVerdict, error } = await supabase
+      .from('verdicts')
+      .insert({
+        user_id: userId,
+        candidate_title: input.title,
+        candidate_price: input.price,
+        candidate_category: input.category,
+        candidate_vendor: input.vendor,
+        justification: input.justification,
+        ...verdictPayload,
+      })
+      .select('id')
+      .single()
 
     if (error) {
       return { data: null, error: error.message }
     }
+
+    verdictId = insertedVerdict.id
+  }
+
+  if (!verdictId) {
+    return { data: null, error: 'Failed to determine verdict id.' }
+  }
+
+  const timerError = await syncHoldReminderTimer(
+    userId,
+    verdictId,
+    holdReleaseAt,
+    preferences.hold_reminders_enabled,
+  )
+  if (timerError) {
+    return { data: null, error: timerError }
   }
 
   const { data, error: fetchError } = await supabase
@@ -272,9 +360,8 @@ export async function submitVerdict(
     .select(
       'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
     )
+    .eq('id', verdictId)
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
     .maybeSingle()
 
   if (fetchError) {
@@ -285,15 +372,30 @@ export async function submitVerdict(
 }
 
 const fetchUserProfile = async (userId: string) => {
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('users')
-    .select('weekly_fun_budget, onboarding_answers')
+    .select('weekly_fun_budget, onboarding_answers, preferences')
     .eq('id', userId)
     .maybeSingle()
+
+  if (error && isMissingPreferencesColumnError(error.message)) {
+    const { data: legacyProfile } = await supabase
+      .from('users')
+      .select('weekly_fun_budget, onboarding_answers')
+      .eq('id', userId)
+      .maybeSingle()
+
+    return {
+      weeklyBudget: (legacyProfile?.weekly_fun_budget as number | null) ?? null,
+      onboardingAnswers: (legacyProfile?.onboarding_answers as OnboardingAnswers | null) ?? null,
+      preferences: normalizeUserPreferences(null),
+    }
+  }
 
   return {
     weeklyBudget: (profile?.weekly_fun_budget as number | null) ?? null,
     onboardingAnswers: (profile?.onboarding_answers as OnboardingAnswers | null) ?? null,
+    preferences: normalizeUserPreferences((profile?.preferences as UserPreferences | null) ?? null),
   }
 }
 
@@ -302,6 +404,7 @@ const gatherEvaluationContext = async (
   input: PurchaseInput,
   weeklyBudget: number | null,
   onboardingAnswers: OnboardingAnswers | null,
+  preferences: UserPreferences,
   openaiApiKey?: string
 ): Promise<EvaluationContext> => {
   const vendorMatch = await retrieveVendorMatch(input)
@@ -311,7 +414,7 @@ const gatherEvaluationContext = async (
   const financialStrain = buildScore(
     financialStrainValue,
     weeklyBudget
-      ? `Relative to weekly fun budget of $${weeklyBudget.toFixed(2)}.`
+      ? `Relative to weekly fun budget of ${formatCurrencyAmount(weeklyBudget, preferences)}.`
       : 'No weekly fun budget set.'
   )
 
@@ -350,13 +453,14 @@ export async function evaluatePurchase(
   input: PurchaseInput,
   openaiApiKey?: string
 ): Promise<EvaluationResult> {
-  const { weeklyBudget, onboardingAnswers } = await fetchUserProfile(userId)
+  const { weeklyBudget, onboardingAnswers, preferences } = await fetchUserProfile(userId)
 
   const context = await gatherEvaluationContext(
     userId,
     input,
     weeklyBudget,
     onboardingAnswers,
+    preferences,
     openaiApiKey
   )
 

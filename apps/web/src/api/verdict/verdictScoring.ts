@@ -118,7 +118,7 @@ const buildAlternativeSolution = (input: PurchaseInput) => {
   const suggestions: string[] = []
 
   if (!input.justification || input.justification.length < 20) {
-    suggestions.push('Write down the specific problem this solves and revisit it after 24 hours.')
+    suggestions.push('Write down the specific problem this solves and revisit it after your hold window.')
   }
 
   if (input.price !== null) {
@@ -247,7 +247,7 @@ export const evaluatePurchaseFallback = (
     decisionResult.outcome === 'buy'
       ? 'This purchase is recommended'
       : decisionResult.outcome === 'hold'
-        ? 'Holding for 24 hours is recommended'
+        ? 'Holding before deciding is recommended'
         : 'Skipping this purchase is recommended'
 
   // Build narrative rationale

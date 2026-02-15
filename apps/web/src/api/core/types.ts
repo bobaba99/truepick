@@ -52,6 +52,8 @@ export type {
   UserValueRow,
   OnboardingAnswers,
   UserValueType,
+  UserPreferences,
+  ThemeMode,
 } from '../../constants'
 
 export { PURCHASE_CATEGORIES, USER_VALUE_DESCRIPTIONS } from '../../constants'

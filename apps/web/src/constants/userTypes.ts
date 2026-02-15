@@ -3,6 +3,16 @@
  * Used by: userProfileService, userValueService, verdictContext, Profile page
  */
 
+export type ThemeMode = 'light' | 'dark'
+export type HoldDurationHours = 24 | 48 | 72
+
+export type UserPreferences = {
+  theme: ThemeMode
+  currency: string
+  hold_duration_hours: HoldDurationHours
+  hold_reminders_enabled: boolean
+}
+
 /**
  * Complete user profile database row
  */
@@ -15,6 +25,7 @@ export type UserRow = {
   profile_summary?: string | null
   onboarding_answers?: OnboardingAnswers | null
   weekly_fun_budget?: number | null
+  preferences?: UserPreferences | null
 }
 
 /**

@@ -4,23 +4,14 @@ import { Link, useParams } from 'react-router-dom'
 import type { ResourceRow } from '../api/core/types'
 import { getResourceBySlug } from '../api/resource/resourceService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
-
-const formatPublishedDate = (value: string | null): string | null => {
-  if (!value) {
-    return null
-  }
-  return new Date(value).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+import { useUserFormatting } from '../preferences/UserPreferencesContext'
 
 const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 export default function ResourceDetail() {
+  const { formatDate } = useUserFormatting()
   const { slug } = useParams<{ slug: string }>()
   const [resource, setResource] = useState<ResourceRow | null>(null)
   const [status, setStatus] = useState<'loading' | 'error' | 'not_found' | 'ready'>('loading')
@@ -96,7 +87,7 @@ export default function ResourceDetail() {
     return null
   }
 
-  const publishedDate = formatPublishedDate(resource.published_at ?? resource.created_at)
+  const publishedDate = resource.published_at ?? resource.created_at
 
   return (
     <section className="route-content resource-detail">
@@ -116,7 +107,15 @@ export default function ResourceDetail() {
         <header className="article-header">
           <h1>{resource.title}</h1>
           <div className="article-meta">
-            {publishedDate && <span className="published-date">{publishedDate}</span>}
+            {publishedDate && (
+              <span className="published-date">
+                {formatDate(publishedDate, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </span>
+            )}
             {resource.reading_time_minutes && (
               <span className="reading-time"> Reading time: {resource.reading_time_minutes} min</span>
             )}

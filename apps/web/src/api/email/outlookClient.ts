@@ -201,6 +201,7 @@ export async function listMessagesFiltered(
   maxResults: number = 100,
   nextLink?: string
 ): Promise<OutlookListResult> {
+  void _sinceDays
   const searchQuery = buildReceiptQuery()
   return listMessages(accessToken, searchQuery, maxResults, nextLink)
 }

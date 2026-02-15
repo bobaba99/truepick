@@ -3,13 +3,7 @@ import { Link } from 'react-router-dom'
 import type { ResourceListItem } from '../api/core/types'
 import { getPublishedResources } from '../api/resource/resourceService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
-
-const formatPublishedDate = (value: string | null) => {
-  if (!value) {
-    return null
-  }
-  return new Date(value).toLocaleDateString()
-}
+import { useUserFormatting } from '../preferences/UserPreferencesContext'
 
 type SafeLink = {
   href: string
@@ -37,6 +31,7 @@ const getSafeLink = (value: string | null): SafeLink | null => {
 }
 
 export default function Resources() {
+  const { formatDate } = useUserFormatting()
   const [resources, setResources] = useState<ResourceListItem[]>([])
   const [status, setStatus] = useState('')
 
@@ -76,6 +71,7 @@ export default function Resources() {
         <div className="resources-grid">
           {resources.map((resource) => {
             const ctaLink = getSafeLink(resource.cta_url)
+            const publishedDate = resource.published_at ?? resource.created_at
 
             return (
               <GlassCard key={resource.id} className="verdict-card">
@@ -88,10 +84,9 @@ export default function Resources() {
                     {resource.reading_time_minutes && (
                       <span>Reading time: {resource.reading_time_minutes} min</span>
                     )}
-                    {formatPublishedDate(resource.published_at ?? resource.created_at) && (
+                    {publishedDate && (
                       <span>
-                        Published:{' '}
-                        {formatPublishedDate(resource.published_at ?? resource.created_at)}
+                        Published: {formatDate(publishedDate)}
                       </span>
                     )}
                     {Array.isArray(resource.tags) && resource.tags.length > 0 && (

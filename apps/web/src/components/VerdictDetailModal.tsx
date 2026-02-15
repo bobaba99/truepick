@@ -1,5 +1,6 @@
 import type { VerdictRow } from '../api/core/types'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
+import { useUserFormatting } from '../preferences/UserPreferencesContext'
 
 type VerdictDetailModalProps = {
   verdict: VerdictRow
@@ -63,6 +64,7 @@ export default function VerdictDetailModal({
   onRegenerate,
   isRegenerating = false,
 }: VerdictDetailModalProps) {
+  const { formatCurrency, formatDateTime } = useUserFormatting()
   if (!isOpen) return null
 
   const reasoning = verdict.reasoning as ReasoningData | null
@@ -137,7 +139,7 @@ export default function VerdictDetailModal({
               <div className="detail-item">
                 <span className="detail-label">Price</span>
                 <span className="detail-value">
-                  ${verdict.candidate_price.toFixed(2)}
+                  {formatCurrency(verdict.candidate_price)}
                 </span>
               </div>
             )}
@@ -175,7 +177,7 @@ export default function VerdictDetailModal({
               <div className="detail-item">
                 <span className="detail-label">Created</span>
                 <span className="detail-value">
-                  {new Date(verdict.created_at).toLocaleString()}
+                  {formatDateTime(verdict.created_at)}
                 </span>
               </div>
             )}
@@ -352,7 +354,7 @@ export default function VerdictDetailModal({
             <div className="detail-section">
               <h3>Hold Information</h3>
               <p className="detail-text">
-                Hold expires: {new Date(verdict.hold_release_at).toLocaleString()}
+                Hold expires: {formatDateTime(verdict.hold_release_at)}
               </p>
             </div>
           )}
@@ -363,7 +365,7 @@ export default function VerdictDetailModal({
               <p className="detail-text">
                 <strong>{verdict.user_decision}</strong>
                 {verdict.user_decision === 'hold' && verdict.user_hold_until && (
-                  <> (until {new Date(verdict.user_hold_until).toLocaleString()})</>
+                  <> (until {formatDateTime(verdict.user_hold_until)})</>
                 )}
               </p>
             </div>
