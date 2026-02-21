@@ -70,3 +70,62 @@ Clean up work trees:
 # Delete remote branch
 
 `git push original --delete [branch name]`
+
+# Branching + global docs workflow
+
+## Start a second independent feature
+
+Keep current feature branch alive, then:
+`git switch main`
+`git pull`
+`git switch -c feat/<second-feature>`
+
+Optional (parallel work, recommended):
+`git worktree add .worktrees/feat-<second-feature> -b feat/<second-feature> main`
+
+## Global docs updates (affect all features)
+
+Do docs in a small docs branch from main:
+`git switch main`
+`git pull`
+`git switch -c docs/<topic>`
+`git commit -m "doc: <topic>"`
+`git push -u origin docs/<topic>`
+
+After docs PR is merged, update feature branches:
+`git fetch origin`
+`git switch feat/<feature>`
+`git rebase origin/main`
+
+## If docs were accidentally committed in a feature branch
+
+Create docs branch and move commit there:
+`git switch main`
+`git pull`
+`git switch -c docs/<topic>`
+`git cherry-pick <doc-commit-hash>`
+`git push -u origin docs/<topic>`
+
+Then remove that commit from feature branch:
+`git switch feat/<feature>`
+`git rebase -i main`
+
+In Vim during rebase:
+- change `pick <doc-commit>` to `drop <doc-commit>` (or delete that line)
+- save + quit: `Esc`, `:wq`, `Enter`
+
+## Push rejected after rebase (non-fast-forward)
+
+Use:
+`git push --force-with-lease`
+
+If still blocked:
+`git fetch origin`
+`git log --oneline --decorate --graph HEAD..origin/<branch>`
+
+## Keep or delete branch?
+
+- Keep branch alive while work/PR is still active.
+- Delete after merge:
+`git branch -d feat/<feature>`
+`git push origin --delete feat/<feature>`
