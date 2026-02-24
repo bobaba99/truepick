@@ -51,6 +51,7 @@
 - [ ] Implement settings route/page with language, theme, currency, etc. — **Branch:** `feat/settings-route-user-preferences`
 - [ ] Implement behavioural responses telemetry and analytics — **Branch:** `feat/behavioral-telemetry-analytics`
 - [ ] Implement swiping if alternative solution is selected and add branching logic to alternatives based on justification (budget or emotional alternative) `feat/alternative-solution`
+- [ ] Implement user data deletion and data request `feat/account-data-request-deletion`
 
 ---
 
