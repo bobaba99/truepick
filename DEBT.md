@@ -4,6 +4,7 @@
 
 - I could add something like '85% of the users chose skip and was satisfied with their skip.'
 - Include community support from others right after receiving the verdicts.
+- Include placeholders for social media accounts
 
 `fix/[]`
 

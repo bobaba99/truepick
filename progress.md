@@ -37,12 +37,12 @@
 - [x] Improved auth compatibility in `supabase/seed.sql` by making seed user creation auth-backed and cleaning orphan profile rows.
 - [x] Fixed Profile empty-state alignment so verdict empty card aligns with purchase history cards.
 - [x] Implement purchase import from email route/page — **Branch:** `feat/purchase-email-import-flow`
+- [x] Tighten verdict evaluation path robustness and UX messaging for LLM failure/timeout cases — **Branch:** `fix/verdict-llm-timeout-handling`
 
 ---
 
 ## In Progress
 
-- [ ] Tighten verdict evaluation path robustness and UX messaging for LLM failure/timeout cases — **Branch:** `fix/verdict-llm-timeout-handling`
 - [ ] Refine Profile and history UX polish after recent structural updates — **Branch:** `fix/profile-history-ux-polish`
 - [ ] Mobile viewing adaptation `ui/mobile-adaptation`
 - [ ] Implement settings route/page with language, theme, currency, etc. — **Branch:** `feat/settings-route-user-preferences`

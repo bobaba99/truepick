@@ -191,7 +191,24 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 - **Result sharing:** generate shareable verdict cards/links for social platforms and messaging to support organic acquisition.
 - **iOS app waitlist / conversion prompts:** non-intrusive web prompts and CTA surface for future iOS premium experience.
 
-### 6.1 Future Features
+### 6.1 Free features
+
+- Single decision verdict
+- Establishing the user profile (i.e., values)
+- Email API seeding with past 10 purchases (one-time)
+- Educational content about impulse and regrets
+
+### 6.2 Premium features
+
+- Personalized LLM feature
+  - Analyze spending patterns weekly/monthly, dividend report style, charts and short summaries
+    - "$$$ money redirected to satisfied purchases in the past week."
+  - Alternative solutions instead of making the purchase
+- Ongoing email syncing with new purchases (make sure to merge with the verdict)
+- Blocking apps from the shopping category + user selected apps if decided to hold for 15 minutes before making the purchase like the screentime apps
+
+
+### 6.3 Future Features
 
 - **Chat with verdicts**: users can chat with the verdict in the chat interface to get personalized advice on their purchases.
 
