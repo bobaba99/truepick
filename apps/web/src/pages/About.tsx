@@ -4,12 +4,12 @@ export default function About() {
   return (
     <section className="route-content">
       <div className="section-header">
-        <h1>About Nopamine</h1>
+        <h1>About Truepick</h1>
       </div>
 
       <div className="dashboard-grid">
         <GlassCard className="verdict-result">
-          <h2>Why Nopamine exists</h2>
+          <h2>Why Truepick exists</h2>
           <p>
             (Boilerplate) This section explains the problem of impulse buying and purchase regret.
           </p>
@@ -33,7 +33,7 @@ export default function About() {
           </p>
 
           <h3>Future vision</h3>
-          <p>(Boilerplate) Where Nopamine is heading.</p>
+          <p>(Boilerplate) Where Truepick is heading.</p>
         </GlassCard>
       </div>
     </section>

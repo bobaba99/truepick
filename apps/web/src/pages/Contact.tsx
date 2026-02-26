@@ -13,12 +13,12 @@ export default function Contact() {
           
           <p>
             <strong>Support email:</strong>{' '}
-            <a href="mailto:support@nopamine.app">support@nopamine.app</a>
+            <a href="mailto:support@truepick.app">support@truepick.app</a>
           </p>
 
           <div className="profile-summary" style={{ marginTop: '1.5rem' }}>
             <p>
-              Nopamine is built and maintained by a solo developer. 
+              Truepick is built and maintained by a solo developer. 
               Expect a response within 48 hours.
             </p>
           </div>

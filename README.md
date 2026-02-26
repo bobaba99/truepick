@@ -1,16 +1,16 @@
-# nopamine 智商税检测器
+# truepick 智商税检测器
 
 ## Overview
-nopamine is a tool for detecting and analyzing "stupid tax", designed to help users identify and avoid unnecessary expenses.
+truepick is a tool for detecting and analyzing "stupid tax", designed to help users identify and avoid unnecessary expenses.
 
-nopamine 是一个用于检测和分析智商税的工具，旨在帮助用户识别和避免不必要的支出。
+truepick 是一个用于检测和分析智商税的工具，旨在帮助用户识别和避免不必要的支出。
 
 ## Setup
 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd nopamine
+cd truepick
 
 # Create and activate virtual environment
 python3 -m venv venv
@@ -37,7 +37,7 @@ python main.py
 ## Project Structure
 
 ```
-nopamine/
+truepick/
 ├── .env              # Environment template (committed)
 ├── .env.local        # Your local config (not committed)
 ├── .gitignore

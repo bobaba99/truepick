@@ -11,7 +11,7 @@ export default function Terms() {
         <GlassCard className="verdict-result">
           <h2>Agreement</h2>
           <p>
-            By using Nopamine, you agree to these terms.
+            By using Truepick, you agree to these terms.
           </p>
 
           <h3>Acceptable use</h3>
@@ -29,13 +29,13 @@ export default function Terms() {
 
           <h3>Limitation of liability</h3>
           <p>
-            AI verdicts may be inaccurate. Nopamine is not responsible for purchase decisions 
+            AI verdicts may be inaccurate. Truepick is not responsible for purchase decisions 
             you make based on verdicts.
           </p>
 
           <h3>Intellectual property</h3>
           <p>
-            All content, branding, and verdict systems are the property of Nopamine.
+            All content, branding, and verdict systems are the property of Truepick.
           </p>
 
           <h3>Account termination</h3>
@@ -52,7 +52,7 @@ export default function Terms() {
           </p>
 
           <h3>Contact</h3>
-          <p>Questions about these terms: <a href="mailto:legal@nopamine.app">legal@nopamine.app</a></p>
+          <p>Questions about these terms: <a href="mailto:legal@truepick.app">legal@truepick.app</a></p>
         </GlassCard>
       </div>
     </section>

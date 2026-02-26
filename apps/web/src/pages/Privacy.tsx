@@ -55,7 +55,7 @@ export default function Privacy() {
           <p>(Boilerplate) Do Not Sell, categories of personal information.</p>
 
           <h3>Contact</h3>
-          <p>For data protection inquiries: <a href="mailto:privacy@nopamine.app">privacy@nopamine.app</a></p>
+          <p>For data protection inquiries: <a href="mailto:privacy@truepick.app">privacy@truepick.app</a></p>
         </GlassCard>
       </div>
     </section>

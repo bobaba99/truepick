@@ -1,8 +1,8 @@
 {
-  "name": "nopamine",
+  "name": "truepick",
   "version": "1.0.0",
   "private": "true",
-  "description": "nopamine is a tool for detecting and analyzing \"stupid tax\", designed to help users identify and avoid unnecessary expenses.",
+  "description": "truepick is a tool for detecting and analyzing \"stupid tax\", designed to help users identify and avoid unnecessary expenses.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -20,16 +20,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bobaba99/nopamine.git"
+    "url": "git+https://github.com/bobaba99/truepick.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/bobaba99/nopamine/issues"
+    "url": "https://github.com/bobaba99/truepick/issues"
   },
-  "homepage": "https://github.com/bobaba99/nopamine#readme",
+  "homepage": "https://github.com/bobaba99/truepick#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
   },

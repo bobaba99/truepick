@@ -109,7 +109,7 @@ function AuthRoute({
         <span className="badge">Regret-based purchase reflection</span>
         <h1>{headline}</h1>
         <p>
-          Nopamine turns regret into a signal. Import purchases, swipe your
+          Truepick turns regret into a signal. Import purchases, swipe your
           feelings, and slow down the next impulse buy with a 24-hour hold.
         </p>
         <div className="pill-row">
@@ -312,7 +312,7 @@ function App() {
       <div className="page">
         {gsapLoaded && <CustomCursor />}
         <header className="topbar">
-          <div className="brand">Nopamine</div>
+          <div className="brand">Truepick</div>
           <nav className="nav topbar-nav">
             {session && (
               <NavLink to="/" end className="nav-link">

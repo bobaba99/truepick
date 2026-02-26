@@ -36,7 +36,7 @@ export default function Support() {
 
           <h3>Common Topics</h3>
           <ul>
-            <li>Getting started with Nopamine</li>
+            <li>Getting started with Truepick</li>
             <li>Understanding your verdicts</li>
             <li>Email sync and privacy</li>
             <li>Account and data management</li>

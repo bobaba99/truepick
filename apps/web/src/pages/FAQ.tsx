@@ -24,7 +24,7 @@ const faqData = [
   },
   {
     question: 'How is this different from a budgeting app?',
-    answer: 'Nopamine intervenes before the purchase, not after. It is a decision tool, not a tracking tool.',
+    answer: 'Truepick intervenes before the purchase, not after. It is a decision tool, not a tracking tool.',
   },
   {
     question: 'What does 智商税 mean?',

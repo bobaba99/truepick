@@ -1,4 +1,4 @@
--- Seed data for nopamine resources
+-- Seed data for truepick resources
 -- This script creates 5 example articles about impulse buying and post-purchase dissonance
 
 INSERT INTO resources (

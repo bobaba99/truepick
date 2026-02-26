@@ -24,12 +24,12 @@ Use git work trees to work on multiple branches at the same time.
 `git worktree remove <path>`
 
 For example:
-`git worktree add ../nopamine-timeout fix/verdict-llm-timeout-handling`
-`git worktree add ../nopamine-email feat/purchase-email-import-flow`
-`git worktree add ../nopamine-settings feat/settings-route-user-preferences`
-`git worktree add ../nopamine-share feat/verdict-share-capability`
-`git worktree add ../nopamine-resources feat/resources-page`
-`git worktree add ../nopamine-seo feat/resources-page-seo-optimization`
+`git worktree add ../truepick-timeout fix/verdict-llm-timeout-handling`
+`git worktree add ../truepick-email feat/purchase-email-import-flow`
+`git worktree add ../truepick-settings feat/settings-route-user-preferences`
+`git worktree add ../truepick-share feat/verdict-share-capability`
+`git worktree add ../truepick-resources feat/resources-page`
+`git worktree add ../truepick-seo feat/resources-page-seo-optimization`
 
 Run API server in `apps/api`:
 `npm --workspace apps/api run dev`
@@ -45,7 +45,7 @@ Merge later:
 `git push`
 
 Clean up work trees:
-`git worktree remove ../nopamine-email`
+`git worktree remove ../truepick-email`
 `git branch -d feat/purchase-email-import-flow`
 
 # Pulling changes from main branch on work trees
