@@ -16,7 +16,7 @@ import { buildSystemPrompt, buildUserPrompt } from './verdictPrompts'
 import { buildScore, evaluatePurchaseFallback } from './verdictScoring'
 import type { VendorMatch } from '../core/types'
 
-const LLM_TIMEOUT_MS = 15_000
+const LLM_TIMEOUT_MS = 60_000
 
 const SUPPORTED_VERDICTS = ['buy', 'hold', 'skip'] as const
 

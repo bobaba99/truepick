@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
@@ -15,6 +15,7 @@ import {
   updateVerdictDecision,
 } from '../api/verdict/verdictService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
+import EvaluatingModal from '../components/EvaluatingModal'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
 
 type DashboardProps = {
@@ -42,8 +43,6 @@ export default function Dashboard({ session }: DashboardProps) {
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [statusType, setStatusType] = useState<'error' | 'info'>('error')
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const evalStartRef = useRef<number | null>(null)
   const generationLockMessage =
     'Another verdict is currently being generated or regenerated. Please wait for it to finish.'
 
@@ -67,23 +66,6 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return () => window.clearTimeout(timeoutId)
   }, [loadStats, loadRecentVerdicts])
-
-  useEffect(() => {
-    if (!submitting) {
-      setElapsedSeconds(0)
-      evalStartRef.current = null
-      return
-    }
-
-    evalStartRef.current = Date.now()
-    const intervalId = window.setInterval(() => {
-      if (evalStartRef.current) {
-        setElapsedSeconds(Math.floor((Date.now() - evalStartRef.current) / 1000))
-      }
-    }, 1000)
-
-    return () => window.clearInterval(intervalId)
-  }, [submitting])
 
   const resetForm = () => {
     setTitle('')
@@ -337,13 +319,7 @@ export default function Dashboard({ session }: DashboardProps) {
               </div>
             </div>
             <LiquidButton className="primary" type="submit" disabled={submitting}>
-              {submitting
-                ? elapsedSeconds >= 10
-                  ? `Evaluating... (${elapsedSeconds}s) — almost there`
-                  : elapsedSeconds > 0
-                    ? `Evaluating... (${elapsedSeconds}s)`
-                    : 'Evaluating...'
-                : 'Evaluate'}
+              {submitting ? 'Evaluating...' : 'Evaluate'}
             </LiquidButton>
           </form>
         </div>
@@ -467,6 +443,8 @@ export default function Dashboard({ session }: DashboardProps) {
           isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />
       )}
+
+      <EvaluatingModal isOpen={submitting || verdictRegeneratingId !== null} />
     </section>
   )
 }
