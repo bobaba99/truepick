@@ -171,6 +171,8 @@ export default function Swipe({ session }: SwipeProps) {
     async (item: SwipeQueueItem, outcome: SwipeOutcome) => {
       if (!session) return
 
+      setCardDetailsOpen(false)
+
       // Optimistically mark as dismissed for animation
       setDismissedIds((prev) => {
         const next = new Set(prev)
@@ -277,8 +279,6 @@ export default function Swipe({ session }: SwipeProps) {
       ))}
     </div>
   )
-
-  const [upcomingExpanded, setUpcomingExpanded] = useState(false)
 
   const renderQueueCard = (item: SwipeQueueItem) => {
     const isDue = item.scheduled_for <= today

@@ -50,7 +50,7 @@ const syncUserRecord = async (activeSession: Session) => {
   )
 
   if (error) {
-    console.error('Failed to sync user record', error)
+    // Non-critical: user record sync failed, app continues normally
   }
 }
 
@@ -220,11 +220,8 @@ function App() {
 
   const handleScroll = useCallback(() => {
     const currentY = window.scrollY
-    if (currentY > lastScrollY.current && currentY > 80) {
-      setHeaderHidden(true)
-    } else {
-      setHeaderHidden(false)
-    }
+    const shouldHide = currentY > lastScrollY.current && currentY > 80
+    setHeaderHidden((prev) => (prev === shouldHide ? prev : shouldHide))
     lastScrollY.current = currentY
   }, [])
 

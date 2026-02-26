@@ -370,7 +370,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
         <div className="decision-section">
           <h2>New evaluation</h2>
-          <form className="decision-form" onSubmit={handleEvaluate}>
+          <form className="decision-form" onSubmit={(e) => void handleEvaluate(e)}>
             <div className="form-row">
               <label>
                 What do you want to buy?

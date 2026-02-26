@@ -171,7 +171,7 @@ export async function updateVerdictDecision(
       }
 
       // Revert verdict decision on purchase creation failure
-      await supabase
+      const { error: rollbackError } = await supabase
         .from('verdicts')
         .update({
           user_decision: previousDecision,
@@ -179,6 +179,10 @@ export async function updateVerdictDecision(
         })
         .eq('id', verdictId)
         .eq('user_id', userId)
+
+      if (rollbackError) {
+        return { error: `${purchaseError.message} (verdict rollback also failed: ${rollbackError.message})`, isDuplicate: false }
+      }
 
       return { error: purchaseError.message, isDuplicate: false }
     }
