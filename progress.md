@@ -30,7 +30,6 @@
 
 ## Completed Tasks
 
-### 2026-02-09
 - [x] Rewrote core project docs to reflect actual implementation: `TECH_STACK.md`, `FRONTEND_GUIDELINES.md`, `BACKEND_GUIDELINES.md`.
 - [x] Updated product docs with concrete content and tables: `PRD.md` and `APP_FLOW.md`.
 - [x] Implemented and lint-fixed major web flows in `apps/web`: Dashboard, Swipe, Profile, verdict detail modal, filters, and kinematics-related issues.

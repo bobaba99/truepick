@@ -79,7 +79,7 @@
 ## 9. Do's and Don'ts
 
 ### Do
--
+- If the action requires creating a new sql script for supabase, it must be done through `supabase migration new [migration-name]` to keep everything documented.
 
 ### Don't
 -

@@ -1,9 +1,0 @@
--- NOTE: This migration has been superseded by modular migrations created on 2026-02-14.
--- It remains as a historical marker to preserve migration history ordering.
--- Active schema creation now lives in:
---   - 20260214094217_modular_01_extensions_and_enums.sql
---   - 20260214094217_modular_02_core_domain_tables.sql
---   - 20260214094217_modular_03_ingestion_tables.sql
---   - 20260214094217_modular_04_indexes.sql
---   - 20260214094217_modular_05_rls_policies.sql
---   - 20260214094217_modular_06_functions_triggers_and_compat.sql
