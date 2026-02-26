@@ -40,6 +40,10 @@ type ProfileProps = {
   session: Session | null
 }
 
+type ProfileTab = 'profile' | 'verdicts' | 'purchases'
+
+const PURCHASE_PAGE_SIZE = 5
+
 const coreValueOptions = [
   'Financial stability',
   'Minimalism / low clutter',
@@ -80,7 +84,7 @@ const decisionStyleOptions = [
 const materialismItems = [
   {
     key: 'centrality',
-    prompt: 'Do you think it’s important to own expensive things?',
+    prompt: 'Do you think it\u2019s important to own expensive things?',
   },
   {
     key: 'happiness',
@@ -150,6 +154,7 @@ const normalizeOnboardingAnswers = (
 
 export default function Profile({ session }: ProfileProps) {
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<ProfileTab>('profile')
   const [, setUserRow] = useState<UserRow | null>(null)
   const [verdicts, setVerdicts] = useState<VerdictRow[]>([])
   const [purchases, setPurchases] = useState<PurchaseRow[]>([])
@@ -163,6 +168,7 @@ export default function Profile({ session }: ProfileProps) {
   const [purchaseEditingId, setPurchaseEditingId] = useState<string | null>(null)
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [purchaseModalMode, setPurchaseModalMode] = useState<'add' | 'edit'>('add')
+  const [purchaseVisibleCount, setPurchaseVisibleCount] = useState(PURCHASE_PAGE_SIZE)
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
   const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
@@ -175,6 +181,7 @@ export default function Profile({ session }: ProfileProps) {
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [emailImportModalOpen, setEmailImportModalOpen] = useState(false)
+  const [profileDetailExpanded, setProfileDetailExpanded] = useState(false)
 
   const materialismAverage =
     (onboardingAnswers.materialism.centrality +
@@ -224,6 +231,9 @@ export default function Profile({ session }: ProfileProps) {
     return matchesFilters(p, purchaseFilters)
   })
 
+  const visiblePurchases = filteredPurchases.slice(0, purchaseVisibleCount)
+  const hasMorePurchases = filteredPurchases.length > purchaseVisibleCount
+
   const loadProfile = useCallback(async () => {
     if (!session) return
 
@@ -231,8 +241,6 @@ export default function Profile({ session }: ProfileProps) {
       const data = await getUserProfile(session.user.id)
 
       if (!data) {
-        // Profile should be auto-created by database trigger on auth signup.
-        // If missing, try to create it (handles edge cases / legacy accounts).
         if (!session.user.email) {
           setUserRow(null)
           setStatus('Profile not found and user email is missing.')
@@ -322,7 +330,7 @@ export default function Profile({ session }: ProfileProps) {
     if (!session) return
 
     try {
-      const data = await getPurchaseHistory(session.user.id, 10)
+      const data = await getPurchaseHistory(session.user.id, 50)
       setPurchases(data)
     } catch {
       setStatus('Unable to load purchases from Supabase. Check RLS policies.')
@@ -495,7 +503,7 @@ export default function Profile({ session }: ProfileProps) {
     }
 
     await loadPurchases()
-    await loadVerdicts() // Reload verdicts in case a verdict-sourced purchase was deleted
+    await loadVerdicts()
     setPurchaseSaving(false)
   }
 
@@ -514,7 +522,7 @@ export default function Profile({ session }: ProfileProps) {
     }
 
     await loadVerdicts()
-    await loadPurchases() // Reload purchases since decision may add/remove a purchase
+    await loadPurchases()
     setVerdictSavingId(null)
   }
 
@@ -533,7 +541,7 @@ export default function Profile({ session }: ProfileProps) {
     }
 
     await loadVerdicts()
-    await loadPurchases() // Reload purchases in case a linked purchase existed
+    await loadPurchases()
     setVerdictSavingId(null)
   }
 
@@ -580,388 +588,381 @@ export default function Profile({ session }: ProfileProps) {
     }
   }
 
+  const renderProfileTab = () => (
+    <>
+      <div className="profile-summary-card">
+        <div className="profile-summary-row">
+          <div>
+            <span className="label">Personal summary</span>
+            <br />
+            <span className="value">{profileSummary || 'Not set'}</span>
+          </div>
+          <div>
+            <span className="label">Weekly fun budget</span>
+            <br />
+            <span className="value">
+              {weeklyFunBudget ? `$${Number(weeklyFunBudget).toFixed(2)}` : 'Not set'}
+            </span>
+          </div>
+        </div>
+        <div className="profile-summary-actions">
+          <LiquidButton
+            type="button"
+            className="ghost"
+            onClick={() => setProfileModalOpen(true)}
+          >
+            Edit Decision Profile
+          </LiquidButton>
+          <LiquidButton
+            type="button"
+            className="ghost"
+            onClick={() => setProfileDetailExpanded((prev) => !prev)}
+          >
+            {profileDetailExpanded ? 'Hide details' : 'View full profile'}
+          </LiquidButton>
+        </div>
+      </div>
+
+      <div className={`collapsible ${profileDetailExpanded ? 'open' : ''}`}>
+        <div>
+          <div className="profile-detail-sections">
+            <div className="profile-detail-group">
+              <h3 className="profile-group-label">What I value</h3>
+              <div className="profile-answer-grid">
+                <GlassCard className="profile-answer">
+                  <span className="label">Core values</span>
+                  <span className="value">
+                    {onboardingAnswers.coreValues.length > 0
+                      ? onboardingAnswers.coreValues.join(', ')
+                      : 'Not set'}
+                  </span>
+                </GlassCard>
+                <GlassCard className="profile-answer">
+                  <span className="label">Satisfaction pattern</span>
+                  <span className="value">
+                    {onboardingAnswers.satisfactionPatterns.length > 0
+                      ? onboardingAnswers.satisfactionPatterns.join(', ')
+                      : 'Not set'}
+                  </span>
+                </GlassCard>
+              </div>
+            </div>
+
+            <div className="profile-detail-group">
+              <h3 className="profile-group-label">What I avoid</h3>
+              <div className="profile-answer-grid">
+                <GlassCard className="profile-answer">
+                  <span className="label">Regret triggers</span>
+                  <span className="value">
+                    {onboardingAnswers.regretPatterns.length > 0
+                      ? onboardingAnswers.regretPatterns.join(', ')
+                      : 'Not set'}
+                  </span>
+                </GlassCard>
+              </div>
+            </div>
+
+            <div className="profile-detail-group">
+              <h3 className="profile-group-label">Decision psychology</h3>
+              <div className="profile-answer-grid">
+                <GlassCard className="profile-answer">
+                  <span className="label">Decision approach</span>
+                  <span className="value">
+                    {onboardingAnswers.decisionStyle || 'Not set'}
+                  </span>
+                </GlassCard>
+                <GlassCard className="profile-answer">
+                  <span className="label">Stress response</span>
+                  <span className="value">{onboardingAnswers.neuroticismScore}/5</span>
+                </GlassCard>
+                <GlassCard className="profile-answer">
+                  <span className="label">Views on expensive things</span>
+                  <span className="value">{materialismAverage.toFixed(1)}/4</span>
+                </GlassCard>
+                <GlassCard className="profile-answer">
+                  <span className="label">Sense of control</span>
+                  <span className="value">{locusSummary}</span>
+                </GlassCard>
+                <GlassCard className="profile-answer">
+                  <span className="label">Identity alignment</span>
+                  <span className="value">
+                    {onboardingAnswers.identityStability || 'Not set'}
+                  </span>
+                </GlassCard>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  const renderVerdictsTab = () => (
+    <div className="verdict-result" style={{ marginTop: 0 }}>
+      <div className="section-header">
+        <h2>Verdict history</h2>
+        <LiquidButton
+          type="button"
+          className="ghost"
+          onClick={() => setVerdictFiltersOpen((o) => !o)}
+        >
+          {verdictFiltersOpen ? 'Hide filters' : 'Filter / Search'}
+        </LiquidButton>
+      </div>
+      <div className={`collapsible ${verdictFiltersOpen ? 'open' : ''}`}>
+        <ListFilters
+          search={verdictSearch}
+          onSearchChange={setVerdictSearch}
+          filters={verdictFilters}
+          onFilterChange={setVerdictFilters}
+          type="verdict"
+        />
+      </div>
+      {filteredVerdicts.length === 0 ? (
+        <div className="empty-card">
+          {verdicts.length === 0 ? 'No verdicts logged yet.' : 'No verdicts match your filters.'}
+        </div>
+      ) : (
+        <div className="verdict-list">
+          {filteredVerdicts.map((verdict) => {
+            const isSaving = verdictSavingId === verdict.id
+            const isRegenerating = verdictRegeneratingId === verdict.id
+            const isBusy = isSaving || isRegenerating
+            return (
+              <GlassCard key={verdict.id} className="verdict-card">
+                <div
+                  className="verdict-card-clickable"
+                  onClick={() => setSelectedVerdict(verdict)}
+                  onKeyDown={(e: KeyboardEvent<HTMLDivElement>) =>
+                    e.key === 'Enter' && setSelectedVerdict(verdict)
+                  }
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div>
+                    <span className="stat-label">Item </span>
+                    <span className="stat-value">{verdict.candidate_title}</span>
+                  </div>
+                  <div className="verdict-meta">
+                    <span>
+                      Price:{' '}
+                      {verdict.candidate_price === null
+                        ? '—'
+                        : `$${verdict.candidate_price.toFixed(2)}`}
+                    </span>
+                    <span>Vendor: {verdict.candidate_vendor ?? '—'}</span>
+                    <span>Category: {verdict.candidate_category ?? '—'}</span>
+                    <span>Recommendation: {verdict.predicted_outcome ?? '—'}</span>
+                    <span>
+                      Date:{' '}
+                      {verdict.created_at
+                        ? new Date(verdict.created_at).toLocaleDateString()
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+                <div className="verdict-actions">
+                  <div className="decision-buttons">
+                    <LiquidButton
+                      type="button"
+                      className="link"
+                      onClick={() => handleVerdictRegenerate(verdict)}
+                      disabled={verdictRegeneratingId !== null || isBusy}
+                    >
+                      {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+                    </LiquidButton>
+                    <LiquidButton
+                      type="button"
+                      className={`decision-btn bought ${verdict.user_decision === 'bought' ? 'active' : ''}`}
+                      onClick={() => handleVerdictDecision(verdict.id, 'bought')}
+                      disabled={isBusy}
+                    >
+                      Bought
+                    </LiquidButton>
+                    <LiquidButton
+                      type="button"
+                      className={`decision-btn hold ${verdict.user_decision === 'hold' ? 'active' : ''}`}
+                      onClick={() => handleVerdictDecision(verdict.id, 'hold')}
+                      disabled={isBusy}
+                    >
+                      Hold 24h
+                    </LiquidButton>
+                    <LiquidButton
+                      type="button"
+                      className={`decision-btn skip ${verdict.user_decision === 'skip' ? 'active' : ''}`}
+                      onClick={() => handleVerdictDecision(verdict.id, 'skip')}
+                      disabled={isBusy}
+                    >
+                      Skip
+                    </LiquidButton>
+                  </div>
+                  <LiquidButton
+                    type="button"
+                    className="link danger"
+                    onClick={() => handleVerdictDelete(verdict.id)}
+                    disabled={isBusy}
+                  >
+                    Delete
+                  </LiquidButton>
+                </div>
+              </GlassCard>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderPurchasesTab = () => (
+    <div className="verdict-result" style={{ marginTop: 0 }}>
+      <div className="section-header">
+        <h2>Purchase history</h2>
+        <div className="header-actions">
+          <LiquidButton
+            type="button"
+            className="ghost"
+            onClick={() => setPurchaseFiltersOpen((o) => !o)}
+          >
+            {purchaseFiltersOpen ? 'Hide filters' : 'Filter / Search'}
+          </LiquidButton>
+          <LiquidButton
+            type="button"
+            className="ghost"
+            onClick={() => setEmailImportModalOpen(true)}
+          >
+            Import from email
+          </LiquidButton>
+          <LiquidButton
+            type="button"
+            className="ghost"
+            onClick={() => {
+              resetPurchaseForm()
+              setPurchaseModalMode('add')
+              setPurchaseModalOpen(true)
+            }}
+          >
+            Add
+          </LiquidButton>
+        </div>
+      </div>
+      <div className={`collapsible ${purchaseFiltersOpen ? 'open' : ''}`}>
+        <ListFilters
+          search={purchaseSearch}
+          onSearchChange={setPurchaseSearch}
+          filters={purchaseFilters}
+          onFilterChange={setPurchaseFilters}
+          type="purchase"
+        />
+      </div>
+      {filteredPurchases.length === 0 ? (
+        <div className="empty-card">
+          {purchases.length === 0 ? 'No purchases logged yet.' : 'No purchases match your filters.'}
+        </div>
+      ) : (
+        <>
+          <div className="verdict-list">
+            {visiblePurchases.map((purchase) => (
+              <GlassCard key={purchase.id} className="verdict-card">
+                <div className="verdict-card-content">
+                  <div>
+                    <span className="stat-label">Item </span>
+                    <span className="stat-value">{purchase.title}</span>
+                  </div>
+                  <div className="verdict-meta">
+                    <span>
+                      Price: ${Number(purchase.price).toFixed(2)}
+                    </span>
+                    <span>Vendor: {purchase.vendor ?? '—'}</span>
+                    <span>Category: {purchase.category ?? '—'}</span>
+                    <span>Source: {purchase.source ?? '—'}</span>
+                    <span>
+                      Date:{' '}
+                      {purchase.purchase_date
+                        ? new Date(purchase.purchase_date).toLocaleDateString()
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+                <div className="verdict-actions">
+                  <LiquidButton
+                    className="link"
+                    type="button"
+                    onClick={() => handlePurchaseEdit(purchase)}
+                  >
+                    Edit
+                  </LiquidButton>
+                  <LiquidButton
+                    className="link danger"
+                    type="button"
+                    onClick={() => handlePurchaseDelete(purchase.id)}
+                    disabled={purchaseSaving}
+                  >
+                    Delete
+                  </LiquidButton>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+          {hasMorePurchases && (
+            <div className="load-more-row">
+              <LiquidButton
+                type="button"
+                className="ghost"
+                onClick={() => setPurchaseVisibleCount((prev) => prev + PURCHASE_PAGE_SIZE)}
+              >
+                Load more ({filteredPurchases.length - purchaseVisibleCount} remaining)
+              </LiquidButton>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+
   return (
     <section className="route-content">
       <h1>Profile</h1>
 
       {status && <div className="status error">{status}</div>}
 
-      <div className="profile-grid">
-        <div>
-          <span className="label">Auth user</span>
-          <br></br>
-          <span className="value">{session?.user.email}</span>
-        </div>
+      <div className="profile-header-card">
+        <span className="value">{session?.user.email}</span>
       </div>
 
-      <div className="values-section">
-        <div className="section-header">
-          <h2>Decision profile</h2>
-          <div className="header-actions">
-            <LiquidButton
-              type="button"
-              className="ghost"
-              onClick={() => setProfileModalOpen(true)}
-            >
-              Edit Decision Profile
-            </LiquidButton>
-          </div>
-        </div>
-        <p className="values-description">
-          Capture who you are and what you care about. This summary guides your verdicts.
-        </p>
-        <p className="profile-hint">
-          Example: I'm a cashier and undergraduate student, I'm thinking about saving for
-          my next semester's tuition.
-        </p>
-        <div className="profile-summary">
-          <div>
-            <span className="label">Personal summary</span>
-            <br></br>
-            <span className="value">{profileSummary || 'Not set'}</span>
-          </div>
-          <div>
-            <span className="label">Weekly fun budget</span>
-            <br></br>
-            <span className="value">
-              {weeklyFunBudget ? `$${Number(weeklyFunBudget).toFixed(2)}` : 'Not set'}
-            </span>
-          </div>
-        </div>
-        <div className="profile-answer-grid">
-          <GlassCard className="profile-answer">
-            <span className="label">Core values</span>
-            <span className="value">
-              {onboardingAnswers.coreValues.length > 0
-                ? onboardingAnswers.coreValues.join(', ')
-                : 'Not set'}
-            </span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Regret triggers</span>
-            <span className="value">
-              {onboardingAnswers.regretPatterns.length > 0
-                ? onboardingAnswers.regretPatterns.join(', ')
-                : 'Not set'}
-            </span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Satisfaction pattern</span>
-            <span className="value">
-              {onboardingAnswers.satisfactionPatterns.length > 0
-                ? onboardingAnswers.satisfactionPatterns.join(', ')
-                : 'Not set'}
-            </span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Decision approach</span>
-            <span className="value">
-              {onboardingAnswers.decisionStyle || 'Not set'}
-            </span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Stress response</span>
-            <span className="value">{onboardingAnswers.neuroticismScore}/5</span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Views on expensive things</span>
-            <span className="value">{materialismAverage.toFixed(1)}/4</span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Sense of control</span>
-            <span className="value">{locusSummary}</span>
-          </GlassCard>
-          <GlassCard className="profile-answer">
-            <span className="label">Identity alignment</span>
-            <span className="value">
-              {onboardingAnswers.identityStability || 'Not set'}
-            </span>
-          </GlassCard>
-        </div>
+      <div className="profile-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'profile'}
+          className={`profile-tab ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          Profile
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'verdicts'}
+          className={`profile-tab ${activeTab === 'verdicts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('verdicts')}
+        >
+          Verdicts
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'purchases'}
+          className={`profile-tab ${activeTab === 'purchases' ? 'active' : ''}`}
+          onClick={() => setActiveTab('purchases')}
+        >
+          Purchases
+        </button>
       </div>
 
-      {/* Previous simple 5-facet value setting */}
-
-      {/* <div className="values-section">
-        <div className="section-header">
-          <h2>Values</h2>
-          <button
-            type="button"
-            className="link"
-            onClick={() => setEditingValues(!editingValues)}
-          >
-            {editingValues ? 'Done' : 'Edit'}
-          </button>
-        </div>
-        {editingValues && (
-          <p className="values-description">
-            Rate how much each factor matters to you (1 = low, 5 = high)
-          </p>
-        )}
-        <div className="values-grid">
-          {valueOptions.map((option) => {
-            const existingValue = getValueForType(option.value)
-            const currentScore = existingValue?.preference_score ?? null
-            const isSaving = savingValueType === option.value
-
-            return (
-              <div key={option.value} className={`value-card ${editingValues ? 'editing' : ''}`}>
-                <div className="value-card-content">
-                  <span className="value-label">{option.label}</span>
-                  <span className="description-label">{option.description}</span>
-                </div>
-                <div className="value-card-footer">
-                  {editingValues ? (
-                    <div className="slider-container">
-                      <input
-                        type="range"
-                        min="1"
-                        max="5"
-                        step="1"
-                        value={currentScore ?? 3}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                          handleValueChange(option.value, Number(e.target.value))
-                        }
-                        disabled={isSaving}
-                        className="value-slider"
-                      />
-                      <div className="slider-labels">
-                        <span>1</span>
-                        <span>2</span>
-                        <span>3</span>
-                        <span>4</span>
-                        <span>5</span>
-                      </div>
-                      <div className="slider-actions">
-                        {currentScore !== null && (
-                          <button
-                            type="button"
-                            className="link danger"
-                            disabled={isSaving}
-                            onClick={() => handleValueChange(option.value, null)}
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="score-display">
-                      {currentScore !== null ? `${currentScore}/5` : 'Not set'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div> */}
-
-      <div className="dashboard-grid">
-        <div className="verdict-result">
-          <div className="section-header">
-            <h2>Verdict history</h2>
-            <LiquidButton
-              type="button"
-              className="ghost"
-              onClick={() => setVerdictFiltersOpen((o) => !o)}
-            >
-              {verdictFiltersOpen ? 'Hide filters' : 'Filter / Search'}
-            </LiquidButton>
-          </div>
-          <div className={`collapsible ${verdictFiltersOpen ? 'open' : ''}`}>
-            <ListFilters
-              search={verdictSearch}
-              onSearchChange={setVerdictSearch}
-              filters={verdictFilters}
-              onFilterChange={setVerdictFilters}
-              type="verdict"
-            />
-          </div>
-          {filteredVerdicts.length === 0 ? (
-            <div className="empty-card">
-              {verdicts.length === 0 ? 'No verdicts logged yet.' : 'No verdicts match your filters.'}
-            </div>
-          ) : (
-            <div className="verdict-list">
-              {filteredVerdicts.map((verdict) => {
-                const isSaving = verdictSavingId === verdict.id
-                const isRegenerating = verdictRegeneratingId === verdict.id
-                const isBusy = isSaving || isRegenerating
-                return (
-                  <GlassCard key={verdict.id} className="verdict-card">
-                    <div
-                      className="verdict-card-clickable"
-                      onClick={() => setSelectedVerdict(verdict)}
-                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) =>
-                        e.key === 'Enter' && setSelectedVerdict(verdict)
-                      }
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div>
-                        <span className="stat-label">Item </span>
-                        <span className="stat-value">{verdict.candidate_title}</span>
-                      </div>
-                      <div className="verdict-meta">
-                        <span>
-                          Price:{' '}
-                          {verdict.candidate_price === null
-                            ? '—'
-                            : `$${verdict.candidate_price.toFixed(2)}`}
-                        </span>
-                        <span>Vendor: {verdict.candidate_vendor ?? '—'}</span>
-                        <span>Category: {verdict.candidate_category ?? '—'}</span>
-                        <span>Recommendation: {verdict.predicted_outcome ?? '—'}</span>
-                        <span>
-                          Date:{' '}
-                          {verdict.created_at
-                            ? new Date(verdict.created_at).toLocaleDateString()
-                            : '—'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="verdict-actions">
-                      <div className="decision-buttons">
-                        <LiquidButton
-                          type="button"
-                          className="link"
-                          onClick={() => handleVerdictRegenerate(verdict)}
-                          disabled={verdictRegeneratingId !== null || isBusy}
-                        >
-                          {isRegenerating ? 'Regenerating...' : 'Regenerate'}
-                        </LiquidButton>
-                        <LiquidButton
-                          type="button"
-                          className={`decision-btn bought ${verdict.user_decision === 'bought' ? 'active' : ''}`}
-                          onClick={() => handleVerdictDecision(verdict.id, 'bought')}
-                          disabled={isBusy}
-                        >
-                          Bought
-                        </LiquidButton>
-                        <LiquidButton
-                          type="button"
-                          className={`decision-btn hold ${verdict.user_decision === 'hold' ? 'active' : ''}`}
-                          onClick={() => handleVerdictDecision(verdict.id, 'hold')}
-                          disabled={isBusy}
-                        >
-                          Hold 24h
-                        </LiquidButton>
-                        <LiquidButton
-                          type="button"
-                          className={`decision-btn skip ${verdict.user_decision === 'skip' ? 'active' : ''}`}
-                          onClick={() => handleVerdictDecision(verdict.id, 'skip')}
-                          disabled={isBusy}
-                        >
-                          Skip
-                        </LiquidButton>
-                      </div>
-                      <LiquidButton
-                        type="button"
-                        className="link danger"
-                        onClick={() => handleVerdictDelete(verdict.id)}
-                        disabled={isBusy}
-                      >
-                        Delete
-                      </LiquidButton>
-                    </div>
-                  </GlassCard>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="verdict-result">
-          <div className="section-header">
-            <h2>Purchase history</h2>
-            <div className="header-actions">
-              <LiquidButton
-                type="button"
-                className="ghost"
-                onClick={() => setPurchaseFiltersOpen((o) => !o)}
-              >
-                {purchaseFiltersOpen ? 'Hide filters' : 'Filter / Search'}
-              </LiquidButton>
-              <LiquidButton
-                type="button"
-                className="ghost"
-                onClick={() => setEmailImportModalOpen(true)}
-              >
-                Import from email
-              </LiquidButton>
-              <LiquidButton
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  resetPurchaseForm()
-                  setPurchaseModalMode('add')
-                  setPurchaseModalOpen(true)
-                }}
-              >
-                Add
-              </LiquidButton>
-            </div>
-          </div>
-          <div className={`collapsible ${purchaseFiltersOpen ? 'open' : ''}`}>
-            <ListFilters
-              search={purchaseSearch}
-              onSearchChange={setPurchaseSearch}
-              filters={purchaseFilters}
-              onFilterChange={setPurchaseFilters}
-              type="purchase"
-            />
-          </div>
-          {filteredPurchases.length === 0 ? (
-            <div className="empty-card">
-              {purchases.length === 0 ? 'No purchases logged yet.' : 'No purchases match your filters.'}
-            </div>
-          ) : (
-            <div className="verdict-list">
-              {filteredPurchases.map((purchase) => (
-                <GlassCard key={purchase.id} className="verdict-card">
-                  <div className="verdict-card-content">
-                    <div>
-                      <span className="stat-label">Item </span>
-                      <span className="stat-value">{purchase.title}</span>
-                    </div>
-                    <div className="verdict-meta">
-                      <span>
-                        Price: ${Number(purchase.price).toFixed(2)}
-                      </span>
-                      <span>Vendor: {purchase.vendor ?? '—'}</span>
-                      <span>Category: {purchase.category ?? '—'}</span>
-                      <span>Source: {purchase.source ?? '—'}</span>
-                      <span>
-                        Date:{' '}
-                        {purchase.purchase_date
-                          ? new Date(purchase.purchase_date).toLocaleDateString()
-                          : '—'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="verdict-actions">
-                    <LiquidButton
-                      className="link"
-                      type="button"
-                      onClick={() => handlePurchaseEdit(purchase)}
-                    >
-                      Edit
-                    </LiquidButton>
-                    <LiquidButton
-                      className="link danger"
-                      type="button"
-                      onClick={() => handlePurchaseDelete(purchase.id)}
-                      disabled={purchaseSaving}
-                    >
-                      Delete
-                    </LiquidButton>
-                  </div>
-                </GlassCard>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="profile-tab-content" role="tabpanel">
+        {activeTab === 'profile' && renderProfileTab()}
+        {activeTab === 'verdicts' && renderVerdictsTab()}
+        {activeTab === 'purchases' && renderPurchasesTab()}
       </div>
 
       {selectedVerdict && createPortal(
@@ -1437,7 +1438,7 @@ export default function Profile({ session }: ProfileProps) {
                 <p className="import-description">
                   Connect your email to automatically import recent purchase receipts.
                 </p>
-                
+
                 <div className="import-options">
                   <button
                     type="button"
@@ -1463,18 +1464,18 @@ export default function Profile({ session }: ProfileProps) {
                     <span className="import-label">Connect Outlook</span>
                   </button>
                 </div>
-                
+
                 <div className="import-privacy-notice">
                   <p>🔒 <strong>Privacy Notice:</strong></p>
                   <p>
-                    The API only reads the last 10 purchase receipts and does not store data 
+                    The API only reads the last 10 purchase receipts and does not store data
                     other than item name, price, vendor, category, and date for the purchases.
                     One time connection only. Reimporting would require your manual authorization again.
                     Read more on how we fetch your reciepts.
                   </p>
                 </div>
               </div>
-              
+
               <div className="values-actions">
                 <LiquidButton
                   className="ghost"

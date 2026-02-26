@@ -48,6 +48,8 @@ export default function AdminResources({ session }: AdminResourcesProps) {
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [saving, setSaving] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const [slug, setSlug] = useState('')
   const [title, setTitle] = useState('')
@@ -83,6 +85,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
     setBodyMarkdown('')
     setIsPublished(false)
     setPublishedAt(null)
+    setAdvancedOpen(false)
 
     if (quillRef.current) {
       quillRef.current.root.innerHTML = ''
@@ -103,6 +106,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
     setBodyMarkdown(resource.body_markdown)
     setIsPublished(resource.is_published)
     setPublishedAt(resource.published_at ?? null)
+    setEditorOpen(true)
 
     if (quillRef.current) {
       quillRef.current.root.innerHTML = resource.body_markdown
@@ -374,42 +378,29 @@ export default function AdminResources({ session }: AdminResourcesProps) {
     }
   }
 
+  const openNewArticle = () => {
+    resetForm()
+    setEditorOpen(true)
+  }
+
+  const backToList = () => {
+    setEditorOpen(false)
+    resetForm()
+  }
+
   return (
     <section className="route-content">
-      <div className="section-header">
-        <h1>Admin Article Editor</h1>
-        <div className="header-actions">
-          <LiquidButton className="ghost" type="button" onClick={resetForm}>
-            New article
-          </LiquidButton>
-          <LiquidButton className="primary" type="button" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </LiquidButton>
-          <LiquidButton
-            className="ghost"
-            type="button"
-            onClick={togglePublish}
-            disabled={!selectedResourceId || saving}
-          >
-            {isPublished ? 'Unpublish' : 'Publish'}
-          </LiquidButton>
-          <LiquidButton
-            className="ghost"
-            type="button"
-            onClick={handleDelete}
-            disabled={!selectedResourceId || saving}
-          >
-            Delete
-          </LiquidButton>
-        </div>
-      </div>
+      {!editorOpen ? (
+        <>
+          <div className="section-header">
+            <h1>Admin Articles</h1>
+            <LiquidButton className="primary" type="button" onClick={openNewArticle}>
+              New article
+            </LiquidButton>
+          </div>
 
-      {status && <div className={`status ${status.type}`}>{status.message}</div>}
-      {imageUploading && <div className="status info">Uploading image...</div>}
+          {status && <div className={`status ${status.type}`}>{status.message}</div>}
 
-      <div className="dashboard-grid">
-        <div className="verdict-result">
-          <h2>Articles</h2>
           {resources.length === 0 ? (
             <div className="empty-card">No articles found.</div>
           ) : (
@@ -436,17 +427,47 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               ))}
             </div>
           )}
-        </div>
+        </>
+      ) : (
+        <>
+          <div className="section-header">
+            <h1>{selectedResource ? `Editing: ${selectedResource.title}` : 'New article'}</h1>
+            <div className="header-actions">
+              <LiquidButton className="ghost" type="button" onClick={backToList}>
+                Back to list
+              </LiquidButton>
+              <LiquidButton className="primary" type="button" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </LiquidButton>
+              <LiquidButton
+                className="ghost"
+                type="button"
+                onClick={togglePublish}
+                disabled={!selectedResourceId || saving}
+              >
+                {isPublished ? 'Unpublish' : 'Publish'}
+              </LiquidButton>
+              <LiquidButton
+                className="ghost"
+                type="button"
+                onClick={handleDelete}
+                disabled={!selectedResourceId || saving}
+              >
+                Delete
+              </LiquidButton>
+            </div>
+          </div>
 
-        <div className="decision-section">
-          <h2>{selectedResource ? `Editing: ${selectedResource.title}` : 'New article'}</h2>
+          {status && <div className={`status ${status.type}`}>{status.message}</div>}
+          {imageUploading && <div className="status info">Uploading image...</div>}
+
           <form className="decision-form" onSubmit={(event) => event.preventDefault()}>
             <label>
               <span className="label-text">Slug <span className="required">*</span></span>
               <VolumetricInput
                 as="input"
                 value={slug}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
                   setSlug(event.target.value)
                 }
                 placeholder="impulse-buying-framework"
@@ -457,7 +478,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               <VolumetricInput
                 as="input"
                 value={title}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                onChange={(event: ChangeEvent<HTMLInputElement>) =>
                   setTitle(event.target.value)
                 }
                 placeholder="A Practical Framework for Impulse Purchases"
@@ -469,7 +490,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
               <VolumetricInput
                 as="textarea"
                 value={summary}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
                   setSummary(event.target.value)
                 }
                 rows={3}
@@ -554,58 +575,76 @@ export default function AdminResources({ session }: AdminResourcesProps) {
                 </div>
               </div>
             </div>
-            <label>
-              <span className="label-text">Canonical URL</span>
-              <VolumetricInput
-                as="input"
-                value={canonicalUrl}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setCanonicalUrl(event.target.value)
-                }
-                placeholder="https://example.com/resources/article-slug"
-              />
-            </label>
-            <label>
-              Cover image URL
-              <VolumetricInput
-                as="input"
-                value={coverImageUrl}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setCoverImageUrl(event.target.value)
-                }
-              />
-            </label>
-            <label>
-              CTA URL
-              <VolumetricInput
-                as="input"
-                value={ctaUrl}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setCtaUrl(event.target.value)
-                }
-                  placeholder="https://your-domain.com/auth"
-              />
-            </label>
-            <div className="toggle-row">
-              <input
-                id="publish-toggle"
-                type="checkbox"
-                checked={isPublished}
-                onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  setIsPublished(event.target.checked)
-                }
-              />
-              <span className="toggle-label">Published</span>
-            </div>
+
             <div className="editor-label">
               Body content <span className="required">*</span>
             </div>
             <div className="admin-editor-shell">
               <div ref={editorContainerRef} />
             </div>
+
+            <div className="form-actions-row">
+              <LiquidButton
+                className="ghost"
+                type="button"
+                onClick={() => setAdvancedOpen((prev) => !prev)}
+              >
+                {advancedOpen ? 'Hide advanced' : 'Advanced / SEO'}
+              </LiquidButton>
+            </div>
+
+            <div className={`collapsible ${advancedOpen ? 'open' : ''}`}>
+              <div>
+                <div className="form-details-inner">
+                  <label>
+                    <span className="label-text">Canonical URL</span>
+                    <VolumetricInput
+                      as="input"
+                      value={canonicalUrl}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setCanonicalUrl(event.target.value)
+                      }
+                      placeholder="https://example.com/resources/article-slug"
+                    />
+                  </label>
+                  <label>
+                    Cover image URL
+                    <VolumetricInput
+                      as="input"
+                      value={coverImageUrl}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setCoverImageUrl(event.target.value)
+                      }
+                    />
+                  </label>
+                  <label>
+                    CTA URL
+                    <VolumetricInput
+                      as="input"
+                      value={ctaUrl}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setCtaUrl(event.target.value)
+                      }
+                      placeholder="https://your-domain.com/auth"
+                    />
+                  </label>
+                  <div className="toggle-row">
+                    <input
+                      id="publish-toggle"
+                      type="checkbox"
+                      checked={isPublished}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setIsPublished(event.target.checked)
+                      }
+                    />
+                    <span className="toggle-label">Published</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </form>
-        </div>
-      </div>
+        </>
+      )}
     </section>
   )
 }

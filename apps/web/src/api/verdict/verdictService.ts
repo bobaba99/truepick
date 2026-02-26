@@ -236,7 +236,11 @@ export async function submitVerdict(
   if (existingVerdictId) {
     const { error } = await supabase
       .from('verdicts')
-      .update(verdictPayload)
+      .update({
+        ...verdictPayload,
+        user_decision: null,
+        user_hold_until: null,
+      })
       .eq('id', existingVerdictId)
       .eq('user_id', userId)
 

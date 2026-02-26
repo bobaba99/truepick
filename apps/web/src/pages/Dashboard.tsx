@@ -32,6 +32,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
   const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
+  const [expandedRationales, setExpandedRationales] = useState<Set<string>>(new Set())
 
   // Form state
   const [title, setTitle] = useState('')
@@ -43,6 +44,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [statusType, setStatusType] = useState<'error' | 'info'>('error')
+  const [formExpanded, setFormExpanded] = useState(false)
   const generationLockMessage =
     'Another verdict is currently being generated or regenerated. Please wait for it to finish.'
 
@@ -127,6 +129,7 @@ export default function Dashboard({ session }: DashboardProps) {
       }
 
       resetForm()
+      setFormExpanded(false)
       await loadStats()
       await loadRecentVerdicts()
     } catch (error) {
@@ -211,122 +214,42 @@ export default function Dashboard({ session }: DashboardProps) {
     }
   }
 
+  const toggleRationale = (verdictId: string) => {
+    setExpandedRationales((prev) => {
+      const next = new Set(prev)
+      if (next.has(verdictId)) {
+        next.delete(verdictId)
+      } else {
+        next.add(verdictId)
+      }
+      return next
+    })
+  }
+
   return (
     <section className="route-content">
       <h1><SplitText>Today's reflection</SplitText></h1>
-      <div className="stat-grid">
-        <GlassCard className="stat-card">
-          <span className="stat-label">Swipes completed</span>
-          <span className="stat-value">{stats.swipesCompleted}</span>
-        </GlassCard>
-        <GlassCard className="stat-card">
-          <span className="stat-label">Regret rate</span>
-          <span className="stat-value">{stats.regretRate}%</span>
-        </GlassCard>
-        <GlassCard className="stat-card">
-          <span className="stat-label">24h holds active</span>
-          <span className="stat-value">{stats.activeHolds}</span>
-        </GlassCard>
+
+      <div className="stat-strip">
+        <span className="stat-strip-item">
+          <span className="stat-strip-value">{stats.swipesCompleted}</span> swiped
+        </span>
+        <span className="stat-strip-separator" aria-hidden="true" />
+        <span className="stat-strip-item">
+          <span className="stat-strip-value">{stats.regretRate}%</span> regret
+        </span>
+        <span className="stat-strip-separator" aria-hidden="true" />
+        <span className="stat-strip-item">
+          <span className="stat-strip-value">{stats.activeHolds}</span> holds
+        </span>
       </div>
-      <p>
-        Considering a purchase? Enter the details below and we'll evaluate it
-        against your patterns.
-      </p>
 
       {status && <div className={`status ${statusType}`}>{status}</div>}
 
       <div className="dashboard-grid">
-        <div className="decision-section">
-          <h2>New purchase decision</h2>
-          <form className="decision-form" onSubmit={handleEvaluate}>
-            <label>
-              What do you want to buy?
-              <VolumetricInput
-                as="input"
-                value={title}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-                placeholder="Noise cancelling headphones"
-                required
-              />
-            </label>
-            <label>
-              Brand / Vendor
-              <VolumetricInput
-                as="input"
-                value={vendor}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setVendor(e.target.value)}
-                placeholder="Amazon"
-              />
-            </label>
-            <div className="form-row">
-              <label>
-                Price
-                <VolumetricInput
-                  as="input"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={price}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
-                  placeholder="299.00"
-                />
-              </label>
-              <label>
-                Category
-                <VolumetricInput
-                  as="select"
-                  value={category}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setCategory(e.target.value)}
-                >
-                  {PURCHASE_CATEGORIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </VolumetricInput>
-              </label>
-            </div>
-            <label>
-              Why do you want this?
-              <GlassCard className="textarea-wrapper">
-                <textarea
-                  value={justification}
-                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setJustification(e.target.value)}
-                  placeholder="I need it for work calls..."
-                  rows={8}
-                />
-              </GlassCard>
-            </label>
-            <div className="toggle-row">
-              <input
-                id="important-purchase-toggle"
-                type="checkbox"
-                checked={importantPurchase}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setImportantPurchase(e.target.checked)}
-                aria-labelledby="important-purchase-label"
-              />
-              <span id="important-purchase-label" className="toggle-label">
-                Important purchase
-              </span>
-            </div>
-            <div className="algorithm-toggle">
-              <span className="toggle-label">Scoring model</span>
-              <div className="segmented-toggle" role="radiogroup" aria-label="Scoring model">
-                <label>
-                  <input type="radio" name="verdict-algorithm" value="llm_only" checked readOnly />
-                  <span>LLM only</span>
-                </label>
-              </div>
-            </div>
-            <LiquidButton className="primary" type="submit" disabled={submitting}>
-              {submitting ? 'Evaluating...' : 'Evaluate'}
-            </LiquidButton>
-          </form>
-        </div>
-
         <div className="verdict-result">
           <div className="section-header">
-            <h2>Latest verdict</h2>
+            <h2>Latest verdicts</h2>
             <LiquidButton as={Link} to="/profile" className="ghost">More</LiquidButton>
           </div>
           {recentVerdicts.length > 0 ? (
@@ -334,6 +257,7 @@ export default function Dashboard({ session }: DashboardProps) {
               {recentVerdicts.map((verdict) => {
                 const rationale =
                   (verdict.reasoning as { rationale?: string } | null)?.rationale ?? ''
+                const isExpanded = expandedRationales.has(verdict.id)
                 return (
                 <GlassCard
                   key={verdict.id}
@@ -375,13 +299,24 @@ export default function Dashboard({ session }: DashboardProps) {
                         {verdict.candidate_vendor ?? '—'}
                         </span>
                       {rationale && (
-                        <div>
+                        <div className={`rationale-container ${isExpanded ? 'expanded' : ''}`}>
                           <strong>Rationale</strong>
                           <div
+                            className={`rationale-content ${isExpanded ? '' : 'rationale-clamped'}`}
                             dangerouslySetInnerHTML={{
                               __html: sanitizeVerdictRationaleHtml(rationale),
                             }}
                           />
+                          <button
+                            type="button"
+                            className="rationale-toggle"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleRationale(verdict.id)
+                            }}
+                          >
+                            {isExpanded ? 'Show less' : 'Show more'}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -431,6 +366,102 @@ export default function Dashboard({ session }: DashboardProps) {
           ) : (
             <div className="empty-card">No verdicts yet.</div>
           )}
+        </div>
+
+        <div className="decision-section">
+          <h2>New evaluation</h2>
+          <form className="decision-form" onSubmit={handleEvaluate}>
+            <div className="form-row">
+              <label>
+                What do you want to buy?
+                <VolumetricInput
+                  as="input"
+                  value={title}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                  placeholder="Noise cancelling headphones"
+                  required
+                />
+              </label>
+              <label>
+                Price
+                <VolumetricInput
+                  as="input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={price}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
+                  placeholder="299.00"
+                />
+              </label>
+            </div>
+
+            <div className={`collapsible ${formExpanded ? 'open' : ''}`}>
+              <div>
+                <div className="form-details-inner">
+                  <label>
+                    Brand / Vendor
+                    <VolumetricInput
+                      as="input"
+                      value={vendor}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setVendor(e.target.value)}
+                      placeholder="Amazon"
+                    />
+                  </label>
+                  <label>
+                    Category
+                    <VolumetricInput
+                      as="select"
+                      value={category}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) => setCategory(e.target.value)}
+                    >
+                      {PURCHASE_CATEGORIES.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </VolumetricInput>
+                  </label>
+                  <label>
+                    Why do you want this?
+                    <GlassCard className="textarea-wrapper">
+                      <textarea
+                        value={justification}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setJustification(e.target.value)}
+                        placeholder="I need it for work calls..."
+                        rows={3}
+                      />
+                    </GlassCard>
+                  </label>
+                  <div className="toggle-row">
+                    <input
+                      id="important-purchase-toggle"
+                      type="checkbox"
+                      checked={importantPurchase}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setImportantPurchase(e.target.checked)}
+                      aria-labelledby="important-purchase-label"
+                    />
+                    <span id="important-purchase-label" className="toggle-label">
+                      Important purchase
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-actions-row">
+              <LiquidButton
+                className="ghost"
+                type="button"
+                onClick={() => setFormExpanded((prev) => !prev)}
+              >
+                {formExpanded ? 'Less details' : 'More details'}
+              </LiquidButton>
+              <LiquidButton className="primary" type="submit" disabled={submitting}>
+                {submitting ? 'Evaluating...' : 'Evaluate'}
+              </LiquidButton>
+            </div>
+          </form>
         </div>
       </div>
 

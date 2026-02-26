@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import { supabase } from './api/core/supabaseClient'
@@ -113,7 +113,7 @@ function AuthRoute({
         <span className="badge">Regret-based purchase reflection</span>
         <h1>{headline}</h1>
         <p>
-          Truepick turns regret into a signal. Import purchases, swipe your
+          TruePick turns regret into a signal. Import purchases, swipe your
           feelings, and slow down the next impulse buy with a 24-hour hold.
         </p>
         <div className="pill-row">
@@ -214,7 +214,24 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
+  const [headerHidden, setHeaderHidden] = useState(false)
+  const lastScrollY = useRef(0)
   const gsapLoaded = useGSAPLoader()
+
+  const handleScroll = useCallback(() => {
+    const currentY = window.scrollY
+    if (currentY > lastScrollY.current && currentY > 80) {
+      setHeaderHidden(true)
+    } else {
+      setHeaderHidden(false)
+    }
+    lastScrollY.current = currentY
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [handleScroll])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -318,8 +335,8 @@ function App() {
     <BrowserRouter>
       <div className="page">
         {gsapLoaded && <CustomCursor />}
-        <header className="topbar">
-          <div className="brand">Truepick</div>
+        <header className={`topbar${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
+          <div className="brand">TruePick</div>
           <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
             {session && (
               <NavLink to="/" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>

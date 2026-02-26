@@ -4,7 +4,7 @@
 
 Last Updated: 2026-02-20
 
-Truepick is not a budgeting app, not a no-buy tool, not a review aggregator. It is a purchase decision therapist, it intervenes at the moment of deliberation, processes your reasoning, identifies whether the motivation is rational or emotional, and routes you to the appropriate resolution path.
+TruePick is not a budgeting app, not a no-buy tool, not a review aggregator. It is a purchase decision therapist, it intervenes at the moment of deliberation, processes your reasoning, identifies whether the motivation is rational or emotional, and routes you to the appropriate resolution path.
 
 ---
 
@@ -23,7 +23,7 @@ Capital One Shopping data shows consumers averaged $282 per month ($3,381 annual
 Stop Impulse Buying (SIB), launched January 2024 by a husband-wife team in Washington state, offers a "Buy or Don't Buy" questionnaire that walks users through generic reflective
 questions. It includes a no-spend challenge tracker and savings tracker but uses no AI, no personalization to user values or personality, and no app-blocking. It remains a small indie product with "thousands" of users.
 
-SpendPause, a recently launched app, uses AI-powered photo analysis to classify purchases as "need vs. want" and includes alternative suggestions and a cooling-off period. It is the closest competitor to Truepick's vision but lacks personality-driven personalization, values-based analysis, and shopping app blocking. It appears to have minimal traction.
+SpendPause, a recently launched app, uses AI-powered photo analysis to classify purchases as "need vs. want" and includes alternative suggestions and a cooling-off period. It is the closest competitor to TruePick's vision but lacks personality-driven personalization, values-based analysis, and shopping app blocking. It appears to have minimal traction.
 
 The biggest adjacent competitor, Cleo AI, validates that an AI-powered, personality-driven financial tool can achieve massive scale with young adults.
 Users engage with Cleo 20x more than traditional banking apps. But Cleo is a budgeting and savings tool that operates retrospectively, not a point-of-purchase decision tool.
@@ -120,9 +120,9 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 
 | ID | User Story | Priority | Acceptance Criteria |
 |----|------------|----------|---------------------|
-| FR-011 | As a user, I want to share my verdict as a visually branded card on social media so that my followers can see and try Truepick. | High | Share button generates an image card (PNG or OG-tagged URL) containing: product name, verdict (Buy/Skip), a 1-line summary of reasoning, and Truepick branding with URL. Supports sharing to Twitter/X, Instagram Stories, iMessage, and clipboard. |
+| FR-011 | As a user, I want to share my verdict as a visually branded card on social media so that my followers can see and try TruePick. | High | Share button generates an image card (PNG or OG-tagged URL) containing: product name, verdict (Buy/Skip), a 1-line summary of reasoning, and TruePick branding with URL. Supports sharing to Twitter/X, Instagram Stories, iMessage, and clipboard. |
 | FR-012 | As a visitor arriving from a shared verdict link, I want to see the original verdict and immediately try my own so that the viral loop completes. | High | Shared verdict URL displays the original verdict card with a prominent "Try your own" CTA that opens the verdict form. No login required. |
-| FR-013 | As a user, I want to copy a direct link to my verdict result so that I can paste it in chats, forums, or messages. | Medium | Copy link button provides a unique permalink to the verdict. Link resolves to a branded landing page showing the verdict with Truepick CTA. |
+| FR-013 | As a user, I want to copy a direct link to my verdict result so that I can paste it in chats, forums, or messages. | Medium | Copy link button provides a unique permalink to the verdict. Link resolves to a branded landing page showing the verdict with TruePick CTA. |
 
 #### 5.1.4 Structured Data Logging
 
@@ -137,7 +137,7 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 
 | ID | User Story | Priority | Acceptance Criteria |
 |----|------------|----------|---------------------|
-| FR-018 | As a visitor arriving from search, I want to read educational content about impulse buying and smart purchasing so that I understand the value Truepick offers. | High | Blog/resource section with SEO-optimized articles. Each article includes an embedded verdict tool CTA. Content covers: impulse buying psychology, the IQ-tax concept, purchase decision frameworks, category-specific regret data. |
+| FR-018 | As a visitor arriving from search, I want to read educational content about impulse buying and smart purchasing so that I understand the value TruePick offers. | High | Blog/resource section with SEO-optimized articles. Each article includes an embedded verdict tool CTA. Content covers: impulse buying psychology, the IQ-tax concept, purchase decision frameworks, category-specific regret data. |
 | FR-019 | As a visitor searching "should I buy [product]", I want to land on a product-specific verdict page so that I can get an instant AI-powered recommendation. | High | Product verdict pages are indexed by search engines. Each page contains: product name, an interactive verdict form pre-filled with the product, and general purchase considerations for the category. Pages generated programmatically for trending/popular products. |
 | FR-020 | As a product owner, I need all verdict pages and blog content to have proper meta tags, structured data, and OG images so that they rank and share well. | Medium | Every page includes: title tag, meta description, OG image, OG title/description, canonical URL, and JSON-LD structured data. Product verdict pages use FAQ schema. |
 
@@ -145,7 +145,7 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 
 | ID | User Story | Priority | Acceptance Criteria |
 |----|------------|----------|---------------------|
-| FR-021 | As a returning web user, I want to see a non-intrusive prompt to download the iOS app so that I am aware of the premium experience without being annoyed. | High | iOS CTA appears after 3rd verdict (not before). Displays: "Get personalized verdicts, spending reports, and more on the Truepick app." Dismissible. Does not reappear for 7 days after dismissal. Smart App Banner on iOS Safari. |
+| FR-021 | As a returning web user, I want to see a non-intrusive prompt to download the iOS app so that I am aware of the premium experience without being annoyed. | High | iOS CTA appears after 3rd verdict (not before). Displays: "Get personalized verdicts, spending reports, and more on the TruePick app." Dismissible. Does not reappear for 7 days after dismissal. Smart App Banner on iOS Safari. |
 | FR-022 | As a web user who creates an account, I want my profile and verdict history to sync to the iOS app so that I do not start over. | High | Account data (profile, verdict history) is stored server-side. iOS app login with same credentials loads full history. No data loss during platform transition. |
 | FR-023 | As a product owner, I need to track the full web-to-iOS funnel so that I can optimize conversion at each step. | Medium | Analytics tracks: unique visitors -> first verdict -> 3rd verdict -> profile created -> account created -> iOS CTA shown -> App Store click. Funnel visualization in admin dashboard. |
 

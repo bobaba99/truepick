@@ -248,12 +248,12 @@ export const SplitText = ({
             display: 'inline-block',
             overflow: 'hidden',
             verticalAlign: 'top',
-            marginRight: '0.25em',
           }}
         >
           <span className="word" style={{ display: 'inline-block', transformOrigin: '0% 100%' }}>
             {word}
           </span>
+          {index < words.length - 1 && '\u00A0'}
         </span>
       ))}
     </div>

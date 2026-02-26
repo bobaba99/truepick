@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { GlassCard } from '../components/Kinematics'
 
 const faqData = [
   {
@@ -24,7 +23,7 @@ const faqData = [
   },
   {
     question: 'How is this different from a budgeting app?',
-    answer: 'Truepick intervenes before the purchase, not after. It is a decision tool, not a tracking tool.',
+    answer: 'TruePick intervenes before the purchase, not after. It is a decision tool, not a tracking tool.',
   },
   {
     question: 'What does 智商税 mean?',
@@ -49,40 +48,36 @@ export default function FAQ() {
         <h1>Frequently Asked Questions</h1>
       </div>
 
-      <div className="dashboard-grid">
-        <GlassCard className="verdict-result">
-          {faqData.map((item, index) => (
-            <div key={index} className="faq-item" style={{ marginBottom: '1rem' }}>
-              <button
-                type="button"
-                onClick={() => toggleQuestion(index)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'inherit',
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  padding: '0.75rem 0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                {item.question}
-                <span>{openIndex === index ? '−' : '+'}</span>
-              </button>
-              {openIndex === index && (
-                <p style={{ padding: '0.5rem 0', color: 'var(--ink-700)' }}>
-                  {item.answer}
-                </p>
-              )}
-            </div>
-          ))}
-        </GlassCard>
-      </div>
+      {faqData.map((item, index) => (
+        <div key={index} className="faq-item" style={{ marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => toggleQuestion(index)}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              background: 'transparent',
+              border: 'none',
+              color: 'inherit',
+              fontSize: '1rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: '0.75rem 0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            {item.question}
+            <span>{openIndex === index ? '−' : '+'}</span>
+          </button>
+          {openIndex === index && (
+            <p style={{ padding: '0.5rem 0', color: 'var(--ink-700)' }}>
+              {item.answer}
+            </p>
+          )}
+        </div>
+      ))}
     </section>
   )
 }

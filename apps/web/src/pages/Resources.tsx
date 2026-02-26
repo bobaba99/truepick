@@ -73,7 +73,7 @@ export default function Resources() {
       {resources.length === 0 ? (
         <div className="empty-card">No published resources yet.</div>
       ) : (
-        <div className="verdict-list">
+        <div className="resources-grid">
           {resources.map((resource) => {
             const ctaLink = getSafeLink(resource.cta_url)
 

@@ -53,6 +53,7 @@ export default function Swipe({ session }: SwipeProps) {
   const [lastSwipe, setLastSwipe] = useState<LastSwipe | null>(null)
   const [undoing, setUndoing] = useState(false)
   const [viewMode, setViewMode] = useState<SwipeFilterMode>('all')
+  const [cardDetailsOpen, setCardDetailsOpen] = useState(false)
   const undoTimerRef = useRef<number | null>(null)
 
   const clearUndoTimer = useCallback(() => {
@@ -94,6 +95,7 @@ export default function Swipe({ session }: SwipeProps) {
     viewMode === 'all' ? true : item.timing === viewMode
 
   const duePurchases = purchases.filter((item) => item.scheduled_for <= today)
+  const dueFiltered = duePurchases.filter(matchesFilter)
   const upcomingPurchases = purchases
     .filter((item) => item.scheduled_for > today)
     .slice()
@@ -134,35 +136,39 @@ export default function Swipe({ session }: SwipeProps) {
     </div>
   )
 
+  const [upcomingExpanded, setUpcomingExpanded] = useState(false)
+
   const renderUpcomingSection = () => {
+    const allFiltered = [...dueFiltered, ...upcomingFiltered]
+
+    if (allFiltered.length === 0) {
+      return (
+        <div className="upcoming-section upcoming-section--empty">
+          <span className="upcoming-empty-hint">
+            {viewMode === 'all'
+              ? 'No schedules'
+              : `No ${formatTimingLabel(viewMode as SwipeTiming).toLowerCase()} schedules`}
+          </span>
+        </div>
+      )
+    }
+
     return (
       <div className="upcoming-section">
-        <div className="upcoming-header">
-          <div>
-            <h1>Upcoming schedules</h1>
-            <p>These purchases are scheduled but not due to swipe yet.</p>
-          </div>
-          {renderFilter()}
-        </div>
-        {upcomingFiltered.length === 0 ? (
-          <div className="empty-card">
-            {viewMode === 'all'
-              ? 'No upcoming schedules yet.'
-              : 'No upcoming schedules match this filter.'}
-          </div>
-        ) : (
-          <div className="upcoming-grid">
-            {upcomingFiltered.slice(0, 6).map((item) => (
+        <div className="upcoming-grid">
+          {allFiltered.slice(0, 6).map((item) => {
+            const isDue = item.scheduled_for <= today
+            return (
               <GlassCard key={item.schedule_id} className="upcoming-card glass-panel">
                 <span className="upcoming-title">{item.purchase.title}</span>
                 <span className="upcoming-meta">
                   {formatTimingLabel(item.timing)} •{' '}
-                  {new Date(item.scheduled_for).toLocaleDateString()}
+                  {isDue ? 'Due now' : new Date(item.scheduled_for).toLocaleDateString()}
                 </span>
               </GlassCard>
-            ))}
-          </div>
-        )}
+            )
+          })}
+        </div>
       </div>
     )
   }
@@ -239,6 +245,7 @@ export default function Swipe({ session }: SwipeProps) {
         })
 
         setCurrentIndex((prev) => prev + 1)
+        setCardDetailsOpen(false)
         setSwiping(false)
         setSwipeDirection(null)
 
@@ -379,6 +386,7 @@ export default function Swipe({ session }: SwipeProps) {
   if (purchases.length === 0) {
     return (
       <section className="route-content">
+        {renderFilter()}
         {renderUpcomingSection()}
         <h1>Swipe queue</h1>
         <p>Rate your past purchases to build your regret patterns.</p>
@@ -392,6 +400,7 @@ export default function Swipe({ session }: SwipeProps) {
   if (!currentPurchase) {
     return (
       <section className="route-content">
+        {renderFilter()}
         {renderUpcomingSection()}
         <h1>Swipe queue</h1>
         <p>
@@ -438,6 +447,7 @@ export default function Swipe({ session }: SwipeProps) {
 
   return (
     <section className="route-content">
+      {renderFilter()}
       {renderUpcomingSection()}
 
       <h1>Swipe queue</h1>
@@ -520,24 +530,42 @@ export default function Swipe({ session }: SwipeProps) {
               <span className="swipe-price">
                 ${Number(currentPurchase.price).toFixed(2)}
               </span>
-              <div className="swipe-meta">
-                {currentPurchase.vendor && (
-                  <span>Vendor: {currentPurchase.vendor}</span>
-                )}
-                {currentPurchase.category && (
-                  <span>Category: {currentPurchase.category}</span>
-                )}
-                <span>
-                  Considered:{' '}
-                  {new Date(currentPurchase.purchase_date).toLocaleDateString()}
-                </span>
-                {currentItem && (
-                  <span>
-                    Scheduled:{' '}
-                    {new Date(currentItem.scheduled_for).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
+              {currentPurchase.vendor && (
+                <span className="swipe-vendor">{currentPurchase.vendor}</span>
+              )}
+              {(currentPurchase.category || currentItem) && (
+                <>
+                  <button
+                    type="button"
+                    className="swipe-details-toggle"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCardDetailsOpen((prev) => !prev)
+                    }}
+                  >
+                    {cardDetailsOpen ? 'Less' : 'Details'}
+                  </button>
+                  <div className={`collapsible ${cardDetailsOpen ? 'open' : ''}`}>
+                    <div>
+                      <div className="swipe-meta">
+                        {currentPurchase.category && (
+                          <span>Category: {currentPurchase.category}</span>
+                        )}
+                        <span>
+                          Considered:{' '}
+                          {new Date(currentPurchase.purchase_date).toLocaleDateString()}
+                        </span>
+                        {currentItem && (
+                          <span>
+                            Scheduled:{' '}
+                            {new Date(currentItem.scheduled_for).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </GlassCard>
         </div>

@@ -142,12 +142,6 @@ export default function ResourceDetail() {
         />
       </article>
 
-      <footer className="article-footer">
-        <Link to="/resources" className="back-link">
-          Back to Resources
-        </Link>
-      </footer>
-
       {createPortal(
         <div className="floating-buttons">
           <LiquidButton
