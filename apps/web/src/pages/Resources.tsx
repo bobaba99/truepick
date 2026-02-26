@@ -104,6 +104,7 @@ export default function Resources() {
                     as={Link}
                     to={`/resources/${resource.slug}`}
                     className="primary"
+                    aria-label={`Read more about ${resource.title}`}
                   >
                     Read more
                   </LiquidButton>

@@ -62,7 +62,11 @@ function RequireAuth({ session }: { session: Session | null }) {
   return <Outlet />
 }
 
-function PublicOnly({ children }: { session: Session | null; children: React.ReactNode }) {
+function PublicOnly({ session, children }: { session: Session | null; children: React.ReactNode }) {
+  if (session) {
+    return <Navigate to="/" replace />
+  }
+
   return children
 }
 
@@ -208,11 +212,14 @@ function App() {
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [loading, setLoading] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const gsapLoaded = useGSAPLoader()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
+      setSessionLoading(false)
     })
 
     const {
@@ -313,61 +320,90 @@ function App() {
         {gsapLoaded && <CustomCursor />}
         <header className="topbar">
           <div className="brand">Truepick</div>
-          <nav className="nav topbar-nav">
+          <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
             {session && (
-              <NavLink to="/" end className="nav-link">
+              <NavLink to="/" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                 Dashboard
               </NavLink>
             )}
             {session && (
-              <NavLink to="/swipe" className="nav-link">
+              <NavLink to="/swipe" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                 Swipe
               </NavLink>
             )}
             {session && (
-              <NavLink to="/profile" className="nav-link">
+              <NavLink to="/profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                 Profile
               </NavLink>
             )}
             {session && isAdminUser && (
-              <NavLink to="/admin/resources" className="nav-link">
+              <NavLink to="/admin/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                 Admin
               </NavLink>
             )}
-            <NavLink to="/resources" className="nav-link">
+            <NavLink to="/resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
               Resources
             </NavLink>
-            <NavLink to="/about" className="nav-link">
+            <NavLink to="/about" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
               About
             </NavLink>
-            <NavLink to="/support" className="nav-link">
+            <NavLink to="/support" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
               Support
             </NavLink>
           </nav>
           <div className="top-actions">
             {session ? (
-              <div className="session-chip">
-                <span className="session-label">Signed in</span>
-                <span className="session-email">{session.user.email}</span>
-                <LiquidButton
-                  className="ghost"
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={loading}
-                  data-cursor="expand"
-                >
-                  Sign out
-                </LiquidButton>
-              </div>
+              <>
+                <div className="session-chip session-chip--desktop">
+                  <span className="session-label">Signed in</span>
+                  <span className="session-email">{session.user.email}</span>
+                  <LiquidButton
+                    className="ghost"
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={loading}
+                    data-cursor="expand"
+                  >
+                    Sign out
+                  </LiquidButton>
+                </div>
+                <div className="session-chip session-chip--mobile">
+                  <span className="avatar-placeholder" aria-label="User profile">
+                    {session.user.email?.charAt(0).toUpperCase() ?? '?'}
+                  </span>
+                  <LiquidButton
+                    className="ghost"
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={loading}
+                    data-cursor="expand"
+                  >
+                    Sign out
+                  </LiquidButton>
+                </div>
+              </>
             ) : (
               <span className="hint">Start with email + password</span>
             )}
           </div>
+          <button
+            className="mobile-menu-toggle"
+            type="button"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span className={`hamburger${mobileMenuOpen ? ' hamburger--open' : ''}`} />
+          </button>
         </header>
 
         <main className="content">
+          {sessionLoading ? (
+            <div className="session-loading">
+              <div className="eval-spinner" />
+            </div>
+          ) : (
           <Routes>
-            <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route
               path="/auth"
               element={
@@ -404,13 +440,7 @@ function App() {
             </Route>
 
             <Route element={<RequireAuth session={session} />}>
-              <Route
-                element={
-                  session ? (
-                    <AppShell />
-                  ) : null
-                }
-              >
+              <Route element={<AppShell />}>
                 <Route index element={<Dashboard session={session} />} />
                 <Route path="swipe" element={<Swipe session={session} />} />
                 <Route path="profile" element={<Profile session={session} />} />
@@ -430,6 +460,7 @@ function App() {
               element={<Navigate to={session ? '/' : '/auth'} replace />}
             />
           </Routes>
+          )}
         </main>
       </div>
     </BrowserRouter>

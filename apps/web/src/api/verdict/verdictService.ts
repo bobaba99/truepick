@@ -112,7 +112,7 @@ export async function updateVerdictDecision(
     .single()
 
   if (fetchError) {
-    return { error: fetchError.message }
+    return { error: fetchError.message, isDuplicate: false }
   }
 
   const previousDecision = verdict.user_decision
@@ -124,8 +124,23 @@ export async function updateVerdictDecision(
       .eq('verdict_id', verdictId)
 
     if (deleteError) {
-      return { error: deleteError.message }
+      return { error: deleteError.message, isDuplicate: false }
     }
+  }
+
+  // Update verdict decision first — add_purchase reads user_decision
+  // from the verdicts table to determine which schedules to create
+  const { error: updateError } = await supabase
+    .from('verdicts')
+    .update({
+      user_decision: decision,
+      user_hold_until: userHoldUntil,
+    })
+    .eq('id', verdictId)
+    .eq('user_id', userId)
+
+  if (updateError) {
+    return { error: updateError.message, isDuplicate: false }
   }
 
   if (decision === 'bought' && previousDecision !== 'bought') {
@@ -155,20 +170,21 @@ export async function updateVerdictDecision(
         return { error: null, isDuplicate: true }
       }
 
+      // Revert verdict decision on purchase creation failure
+      await supabase
+        .from('verdicts')
+        .update({
+          user_decision: previousDecision,
+          user_hold_until: verdict.user_hold_until,
+        })
+        .eq('id', verdictId)
+        .eq('user_id', userId)
+
       return { error: purchaseError.message, isDuplicate: false }
     }
   }
 
-  const { error } = await supabase
-    .from('verdicts')
-    .update({
-      user_decision: decision,
-      user_hold_until: userHoldUntil,
-    })
-    .eq('id', verdictId)
-    .eq('user_id', userId)
-
-  return { error: error?.message ?? null, isDuplicate: false }
+  return { error: null, isDuplicate: false }
 }
 
 export async function deleteVerdict(

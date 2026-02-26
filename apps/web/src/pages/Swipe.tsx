@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../api/core/types'
 import { getUnratedPurchases, createSwipe, deleteSwipe } from '../api/purchase/swipeService'
@@ -302,6 +302,62 @@ export default function Swipe({ session }: SwipeProps) {
     handleUndo,
   ])
 
+  // Touch swipe gesture support
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  const handleTouchStart = useCallback((event: ReactTouchEvent) => {
+    if (swiping || !currentPurchase) return
+    const touch = event.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    if (cardRef.current) {
+      cardRef.current.style.transition = 'none'
+    }
+  }, [swiping, currentPurchase])
+
+  const handleTouchMove = useCallback((event: ReactTouchEvent) => {
+    if (!touchStartRef.current || !cardRef.current || swiping) return
+    const touch = event.touches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+
+    // Only track horizontal swipes (prevent vertical scroll interference)
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      event.preventDefault()
+    }
+
+    const rotation = deltaX * 0.08
+    const opacity = Math.max(0.4, 1 - Math.abs(deltaX) / 300)
+    cardRef.current.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg)`
+    cardRef.current.style.opacity = String(opacity)
+  }, [swiping])
+
+  const handleTouchEnd = useCallback((event: ReactTouchEvent) => {
+    if (!touchStartRef.current || !cardRef.current || swiping) return
+    const touch = event.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    touchStartRef.current = null
+
+    const SWIPE_THRESHOLD = 80
+    const SWIPE_DOWN_THRESHOLD = 100
+
+    // Reset card inline styles
+    cardRef.current.style.transition = ''
+    cardRef.current.style.transform = ''
+    cardRef.current.style.opacity = ''
+
+    if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < 0) {
+        handleRegret()
+      } else {
+        handleSatisfied()
+      }
+    } else if (deltaY > SWIPE_DOWN_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
+      handleNotSure()
+    }
+  }, [swiping, handleRegret, handleSatisfied, handleNotSure])
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -398,6 +454,7 @@ export default function Swipe({ session }: SwipeProps) {
           ? 'Do you regret NOT buying this? Left = yes (regret), Right = no (satisfied), Down = not sure.'
           : 'Rate your past purchases. Left = regret, Right = satisfied, Down = not sure.'}
         <span className="keyboard-hint"> Use ← → ↓ or N</span>
+        <span className="swipe-touch-hint"> Swipe left / right / down on the card</span>
       </p>
 
       {status && <div className="status error">{status}</div>}
@@ -407,8 +464,9 @@ export default function Swipe({ session }: SwipeProps) {
       {lastSwipe && (
         <div className="undo-toast">
           <span>
-            Marked "{lastSwipe.purchaseTitle}" as{' '}
             <strong>{formatOutcomeLabel(lastSwipe.outcome)}</strong>
+            {' — '}
+            <span className="undo-title">{lastSwipe.purchaseTitle}</span>
           </span>
           <LiquidButton
             type="button"
@@ -435,46 +493,54 @@ export default function Swipe({ session }: SwipeProps) {
           </span>
         </LiquidButton>
 
-        <GlassCard
-          className={`swipe-card ${swipeDirection ? `swiping-${swipeDirection}` : ''} ${currentItem?.is_regret_not_buying ? 'regret-not-buying' : ''}`}
+        <div
+          ref={cardRef}
+          className="swipe-card-touch-wrapper"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          <div className="swipe-card-content">
-            {currentItem?.is_regret_not_buying && (
-              <div className="regret-not-buying-label">
-                Did you regret NOT buying this?
+          <GlassCard
+            className={`swipe-card ${swipeDirection ? `swiping-${swipeDirection}` : ''} ${currentItem?.is_regret_not_buying ? 'regret-not-buying' : ''}`}
+          >
+            <div className="swipe-card-content">
+              {currentItem?.is_regret_not_buying && (
+                <div className="regret-not-buying-label">
+                  Did you regret NOT buying this?
+                </div>
+              )}
+              <div className="swipe-title-row">
+                <span className="swipe-title">{currentPurchase.title}</span>
+                {currentItem && (
+                  <span className="timing-chip">
+                    {formatTimingLabel(currentItem.timing)}
+                  </span>
+                )}
               </div>
-            )}
-            <div className="swipe-title-row">
-              <span className="swipe-title">{currentPurchase.title}</span>
-              {currentItem && (
-                <span className="timing-chip">
-                  {formatTimingLabel(currentItem.timing)}
-                </span>
-              )}
-            </div>
-            <span className="swipe-price">
-              ${Number(currentPurchase.price).toFixed(2)}
-            </span>
-            <div className="swipe-meta">
-              {currentPurchase.vendor && (
-                <span>Vendor: {currentPurchase.vendor}</span>
-              )}
-              {currentPurchase.category && (
-                <span>Category: {currentPurchase.category}</span>
-              )}
-              <span>
-                Considered:{' '}
-                {new Date(currentPurchase.purchase_date).toLocaleDateString()}
+              <span className="swipe-price">
+                ${Number(currentPurchase.price).toFixed(2)}
               </span>
-              {currentItem && (
+              <div className="swipe-meta">
+                {currentPurchase.vendor && (
+                  <span>Vendor: {currentPurchase.vendor}</span>
+                )}
+                {currentPurchase.category && (
+                  <span>Category: {currentPurchase.category}</span>
+                )}
                 <span>
-                  Scheduled:{' '}
-                  {new Date(currentItem.scheduled_for).toLocaleDateString()}
+                  Considered:{' '}
+                  {new Date(currentPurchase.purchase_date).toLocaleDateString()}
                 </span>
-              )}
+                {currentItem && (
+                  <span>
+                    Scheduled:{' '}
+                    {new Date(currentItem.scheduled_for).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        </GlassCard>
+          </GlassCard>
+        </div>
 
         <LiquidButton
           className="swipe-button satisfied"
