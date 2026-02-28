@@ -21,6 +21,7 @@ export type {
   PurchaseRow,
   PurchaseInput,
   PurchaseCategory,
+  PurchaseMotivation,
   VendorQuality,
   VendorReliability,
   VendorPriceTier,
@@ -58,4 +59,4 @@ export type {
   ThemeMode,
 } from '../../constants'
 
-export { PURCHASE_CATEGORIES, USER_VALUE_DESCRIPTIONS } from '../../constants'
+export { PURCHASE_CATEGORIES, PURCHASE_MOTIVATIONS, USER_VALUE_DESCRIPTIONS } from '../../constants'

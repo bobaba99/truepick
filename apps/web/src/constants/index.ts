@@ -15,12 +15,13 @@ export type {
   PurchaseRow,
   PurchaseInput,
   PurchaseCategory,
+  PurchaseMotivation,
   VendorQuality,
   VendorReliability,
   VendorPriceTier,
   VendorMatch,
 } from './purchaseTypes'
-export { PURCHASE_CATEGORIES } from './purchaseTypes'
+export { PURCHASE_CATEGORIES, PURCHASE_MOTIVATIONS } from './purchaseTypes'
 
 // Swipe types
 export type {

@@ -27,6 +27,7 @@ export type PurchaseInput = {
   category: string | null
   vendor: string | null
   justification: string | null
+  motivation: PurchaseMotivation | null
   isImportant: boolean
 }
 
@@ -78,3 +79,16 @@ export const PURCHASE_CATEGORIES = [
  * Type-safe purchase category value
  */
 export type PurchaseCategory = (typeof PURCHASE_CATEGORIES)[number]['value']
+
+/**
+ * Quick-select motivation for considering a purchase
+ */
+export const PURCHASE_MOTIVATIONS = [
+  { value: 'need_for_work', label: 'Need for work' },
+  { value: 'replacing_old', label: 'Replacing old' },
+  { value: 'want_it', label: 'Want it' },
+  { value: 'gift', label: 'Gift' },
+  { value: 'health', label: 'Health' },
+] as const
+
+export type PurchaseMotivation = (typeof PURCHASE_MOTIVATIONS)[number]['value']

@@ -276,6 +276,7 @@ export function inputFromVerdict(verdict: VerdictRow): PurchaseInput {
     category: verdict.candidate_category ?? null,
     vendor: verdict.candidate_vendor ?? null,
     justification: verdict.justification ?? null,
+    motivation: (verdict as Record<string, unknown>).purchase_motivation as PurchaseInput['motivation'] ?? null,
     isImportant: reasoning?.importantPurchase ?? false,
   }
 }
@@ -329,6 +330,7 @@ export async function submitVerdict(
         candidate_category: input.category,
         candidate_vendor: input.vendor,
         justification: input.justification,
+        purchase_motivation: input.motivation,
         ...verdictPayload,
       })
       .select('id')

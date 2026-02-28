@@ -1557,6 +1557,200 @@
   }
 }
 
+/* Collapsible reflection bar (mobile only) */
+.reflection-bar {
+  display: none;
+}
+
+.reflection-bar-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-shadow);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--ink-700);
+  text-align: left;
+}
+
+.reflection-bar.expanded .reflection-bar-summary {
+  border-radius: 16px 16px 0 0;
+  border-bottom-color: transparent;
+}
+
+.reflection-bar-label {
+  font-weight: 600;
+  color: var(--ink-900);
+  white-space: nowrap;
+}
+
+.reflection-bar-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-500);
+  white-space: nowrap;
+}
+
+.reflection-bar-stats-sep {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-400);
+}
+
+.reflection-bar-chevron {
+  font-size: 0.75rem;
+  color: var(--ink-400);
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.reflection-bar-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.reflection-bar-list {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  border-radius: 0 0 16px 16px;
+}
+
+.reflection-bar-list.expanded {
+  max-height: 500px;
+  border: 1px solid var(--glass-border);
+  border-top: none;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+}
+
+.reflection-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ink-700);
+}
+
+.reflection-bar-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.reflection-bar-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reflection-bar-item-price {
+  font-weight: 600;
+  color: var(--ink-800);
+  white-space: nowrap;
+}
+
+.outcome-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.outcome-chip.outcome-buy {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.outcome-chip.outcome-hold {
+  background: rgba(251, 191, 36, 0.15);
+  color: #d97706;
+}
+
+.outcome-chip.outcome-skip {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.reflection-bar-empty {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-400);
+}
+
+.reflection-bar-more {
+  display: block;
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: underline;
+}
+
+/* Dashboard — motivation chips */
+.motivation-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.motivation-chip {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  color: var(--ink-600);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.motivation-chip:hover {
+  border-color: rgba(234, 120, 40, 0.4);
+  color: var(--ink-800);
+}
+
+.motivation-chip.active {
+  border-color: rgba(234, 120, 40, 0.6);
+  background: rgba(234, 120, 40, 0.12);
+  color: #c2610c;
+}
+
+/* Form field group (label + chips + textarea) */
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-700);
+}
+
+/* Desktop-only helper */
+.desktop-only {
+  display: revert;
+}
+
 .decision-section {
   margin-top: 2rem;
 }
@@ -3385,8 +3579,13 @@
 /* --- Phone (≤ 600px) --- */
 @media (max-width: 600px) {
   .page {
-    padding: 1.5rem 1rem 2rem;
+    padding: 1.5rem 0.5rem 2rem;
     gap: 2rem;
+  }
+
+  .route-surface {
+    --surface-padding: 1.5rem;
+    border-radius: 16px;
   }
 
   .brand {
@@ -3394,7 +3593,112 @@
   }
 
   .form-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Show reflection bar, hide desktop-only elements */
+  .reflection-bar {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Hide verdict column on mobile — shown in reflection bar instead */
+  .dashboard-grid > .verdict-result {
+    display: none;
+  }
+
+  .dashboard-grid {
+    margin-top: 0;
+    gap: 0;
+  }
+
+  .decision-section {
+    margin-top: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .decision-section > h2 {
+    display: none;
+  }
+
+  .decision-form {
+    gap: 0.6rem;
+  }
+
+  .decision-form label {
+    gap: 0.25rem;
+    font-size: 0.8rem;
+  }
+
+  .decision-form input,
+  .decision-form textarea,
+  .decision-form select {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
+
+  .decision-form textarea {
+    min-height: 56px;
+  }
+
+  .form-field-group {
+    gap: 0.35rem;
+  }
+
+  .form-field-label {
+    font-size: 0.8rem;
+  }
+
+  .motivation-chips {
+    gap: 0.35rem;
+  }
+
+  .motivation-chip {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .reflection-bar {
+    margin-bottom: 0.75rem;
+  }
+
+  .reflection-bar-summary {
+    padding: 0.6rem 0.75rem;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .reflection-bar-label {
+    font-size: 0.8rem;
+  }
+
+  .reflection-bar-stats {
+    font-size: 0.7rem;
+    gap: 0.35rem;
+  }
+
+  .reflection-bar-chevron {
+    font-size: 0.65rem;
+  }
+
+  .form-actions-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .form-actions-row .toggle-row {
+    order: 0;
+  }
+
+  .form-actions-row .primary {
+    width: 100%;
+    order: 1;
   }
 
   .stat-grid {
@@ -3543,7 +3847,16 @@
 /* --- Small phones (≤ 380px) --- */
 @media (max-width: 380px) {
   .page {
-    padding: 1.2rem 0.75rem 1.5rem;
+    padding: 1.2rem 0.35rem 1.5rem;
+  }
+
+  .route-surface {
+    --surface-padding: 1.25rem;
+    border-radius: 12px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 
   .brand {

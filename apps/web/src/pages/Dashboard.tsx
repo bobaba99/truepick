@@ -3,8 +3,8 @@ import type { ChangeEvent, KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import type { Stats, VerdictRow } from '../api/core/types'
-import { PURCHASE_CATEGORIES } from '../api/core/types'
+import type { Stats, VerdictRow, PurchaseMotivation } from '../api/core/types'
+import { PURCHASE_CATEGORIES, PURCHASE_MOTIVATIONS } from '../api/core/types'
 import { getSwipeStats } from '../api/purchase/statsService'
 import { logger } from '../api/core/logger'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
@@ -39,13 +39,14 @@ export default function Dashboard({ session }: DashboardProps) {
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
   const [verdictRegeneratingId, setVerdictRegeneratingId] = useState<string | null>(null)
   const [expandedRationales, setExpandedRationales] = useState<Set<string>>(new Set())
+  const [reflectionExpanded, setReflectionExpanded] = useState(false)
 
   // Form state
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState('other')
-  const [vendor, setVendor] = useState('')
   const [justification, setJustification] = useState('')
+  const [motivation, setMotivation] = useState<PurchaseMotivation | null>(null)
   const [importantPurchase, setImportantPurchase] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
@@ -78,8 +79,8 @@ export default function Dashboard({ session }: DashboardProps) {
     setTitle('')
     setPrice('')
     setCategory('other')
-    setVendor('')
     setJustification('')
+    setMotivation(null)
     setImportantPurchase(false)
   }
 
@@ -106,8 +107,9 @@ export default function Dashboard({ session }: DashboardProps) {
       title: title.trim(),
       price: priceValue,
       category: category.trim() || null,
-      vendor: vendor.trim() || null,
+      vendor: null,
       justification: justification.trim() || null,
+      motivation,
       isImportant: importantPurchase,
     }
 
@@ -230,11 +232,63 @@ export default function Dashboard({ session }: DashboardProps) {
     })
   }
 
+  const outcomeLabel = (outcome: string | null) => {
+    if (outcome === 'buy') return 'Buy'
+    if (outcome === 'hold') return 'Hold'
+    return 'Skip'
+  }
+
   return (
     <section className="route-content">
-      <h1><SplitText>Today's reflection</SplitText></h1>
+      {/* Mobile: collapsible reflection bar */}
+      <div className={`reflection-bar${reflectionExpanded ? ' expanded' : ''}`}>
+        <button
+          type="button"
+          className="reflection-bar-summary"
+          onClick={() => setReflectionExpanded((prev) => !prev)}
+        >
+          <span className="reflection-bar-label">Today's reflection</span>
+          <span className={`reflection-bar-chevron${reflectionExpanded ? ' expanded' : ''}`} aria-hidden="true">
+            ▾
+          </span>
+        </button>
+        <div className={`reflection-bar-list${reflectionExpanded ? ' expanded' : ''}`}>
+          {recentVerdicts.length > 0 ? (
+            recentVerdicts.map((verdict) => (
+              <div
+                key={verdict.id}
+                className="reflection-bar-item"
+                onClick={() => setSelectedVerdict(verdict)}
+                onKeyDown={(e: KeyboardEvent<HTMLDivElement>) =>
+                  e.key === 'Enter' && setSelectedVerdict(verdict)
+                }
+                role="button"
+                tabIndex={0}
+              >
+                <span className="reflection-bar-item-title">{verdict.candidate_title}</span>
+                {verdict.candidate_price && (
+                  <span className="reflection-bar-item-price">
+                    {formatCurrency(verdict.candidate_price)}
+                  </span>
+                )}
+                <span className={`outcome-chip outcome-${verdict.predicted_outcome}`}>
+                  {outcomeLabel(verdict.predicted_outcome)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="reflection-bar-empty">No verdicts yet</div>
+          )}
+          <Link to="/profile?tab=verdicts" className="reflection-bar-more">
+            View all verdicts
+          </Link>
+        </div>
+      </div>
 
-      <div className="stat-strip">
+      {/* Desktop: full heading + stats */}
+      <h1 className="desktop-only"><SplitText>Today's reflection</SplitText></h1>
+
+      <div className="stat-strip desktop-only">
         <span className="stat-strip-item">
           <span className="stat-strip-value">{stats.swipesCompleted}</span> swiped
         </span>
@@ -381,17 +435,18 @@ export default function Dashboard({ session }: DashboardProps) {
         <div className="decision-section">
           <h2>New evaluation</h2>
           <form className="decision-form" onSubmit={(e) => void handleEvaluate(e)}>
+            <label>
+              Product
+              <VolumetricInput
+                as="input"
+                value={title}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                placeholder="e.g. Sony WH-1000XM5 from Amazon"
+                required
+              />
+            </label>
+
             <div className="form-row">
-              <label>
-                What do you want to buy?
-                <VolumetricInput
-                  as="input"
-                  value={title}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-                  placeholder="Noise cancelling headphones"
-                  required
-                />
-              </label>
               <label>
                 Price
                 <VolumetricInput
@@ -402,18 +457,6 @@ export default function Dashboard({ session }: DashboardProps) {
                   value={price}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setPrice(e.target.value)}
                   placeholder="299.00"
-                />
-              </label>
-            </div>
-
-            <div className="form-row">
-              <label>
-                Brand / Vendor
-                <VolumetricInput
-                  as="input"
-                  value={vendor}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setVendor(e.target.value)}
-                  placeholder="Amazon"
                 />
               </label>
               <label>
@@ -432,8 +475,20 @@ export default function Dashboard({ session }: DashboardProps) {
               </label>
             </div>
 
-            <label>
-              Why do you want this?
+            <div className="form-field-group">
+              <span className="form-field-label">Why do you want this?</span>
+              <div className="motivation-chips">
+                {PURCHASE_MOTIVATIONS.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    className={`motivation-chip${motivation === m.value ? ' active' : ''}`}
+                    onClick={() => setMotivation(motivation === m.value ? null : m.value)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
               <GlassCard className="textarea-wrapper">
                 <textarea
                   value={justification}
@@ -442,7 +497,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   rows={3}
                 />
               </GlassCard>
-            </label>
+            </div>
 
             <div className="form-actions-row">
               <div className="toggle-row">
