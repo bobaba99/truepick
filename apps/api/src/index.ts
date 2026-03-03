@@ -16,7 +16,86 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean)
 
+const openaiApiKey = process.env.OPENAI_API_KEY ?? ''
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
+
+type AuthenticatedRequest = express.Request & { authUser: { id: string; email: string } }
+
+const requireAuth = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const authHeader = req.headers.authorization
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) {
+    res.status(401).json({ error: 'Missing or invalid Authorization header.' })
+    return
+  }
+  if (!supabaseUrl || !supabaseServiceKey) {
+    res.status(500).json({ error: 'Server misconfigured: missing Supabase credentials.' })
+    return
+  }
+  const sb = createClient(supabaseUrl, supabaseServiceKey)
+  const {
+    data: { user },
+    error,
+  } = await sb.auth.getUser(token)
+  if (error || !user?.id) {
+    res.status(401).json({ error: 'Invalid or expired token.' })
+    return
+  }
+  ;(req as AuthenticatedRequest).authUser = {
+    id: user.id,
+    email: user.email ?? '',
+  }
+  next()
+}
+
+const rateLimits = new Map<string, number[]>()
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_REQUESTS = 20
+
+const rateLimitLLM = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const userId = (req as AuthenticatedRequest).authUser?.id
+  if (!userId) {
+    res.status(401).json({ error: 'Authentication required.' })
+    return
+  }
+
+  const now = Date.now()
+  const timestamps = (rateLimits.get(userId) ?? []).filter(
+    (t) => now - t < RATE_LIMIT_WINDOW_MS
+  )
+
+  if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    res.status(429).json({
+      error: 'Rate limit exceeded. Please wait a moment before trying again.',
+    })
+    return
+  }
+
+  timestamps.push(now)
+  rateLimits.set(userId, timestamps)
+  next()
+}
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [userId, timestamps] of rateLimits.entries()) {
+    const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+    if (valid.length === 0) {
+      rateLimits.delete(userId)
+    } else {
+      rateLimits.set(userId, valid)
+    }
+  }
+}, 5 * 60 * 1000)
 
 const requireAdmin = async (
   req: express.Request,
