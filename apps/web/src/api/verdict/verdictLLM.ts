@@ -15,8 +15,18 @@ import {
 import { buildSystemPrompt, buildUserPrompt } from './verdictPrompts'
 import { buildScore, evaluatePurchaseFallback } from './verdictScoring'
 import type { VendorMatch } from '../core/types'
+import { supabase } from '../core/supabaseClient'
 
 const LLM_TIMEOUT_MS = 60_000
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
+
+const getAuthToken = async (): Promise<string> => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('No active session')
+  }
+  return session.access_token
+}
 
 const SUPPORTED_VERDICTS = ['buy', 'hold', 'skip'] as const
 
@@ -58,32 +68,31 @@ type LlmAttemptResult =
   | { success: false; retryReason: string }
 
 const attemptLlmCall = async (
-  openaiApiKey: string,
   systemPrompt: string,
   userPrompt: string,
   retryContext: string
 ): Promise<{ data: OpenAIResponse | null; error: string | null }> => {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const token = await getAuthToken()
+
+    const response = await fetch(`${API_BASE_URL}/api/verdict/evaluate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiApiKey}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
+        systemPrompt,
+        userPrompt: `${userPrompt}${retryContext}`,
         model: 'gpt-5-nano',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `${userPrompt}${retryContext}` },
-        ],
-        max_completion_tokens: 4000,
+        maxTokens: 4000,
       }),
       signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     })
 
     if (!response.ok) {
       const errorBody = await response.text()
-      return { data: null, error: `OpenAI API error: ${response.status} - ${errorBody}` }
+      return { data: null, error: `API error: ${response.status} - ${errorBody}` }
     }
 
     const data = (await response.json()) as OpenAIResponse
@@ -146,7 +155,6 @@ const parseLlmResponse = (
 }
 
 const executeLlmWithRetry = async (
-  openaiApiKey: string,
   systemPrompt: string,
   userPrompt: string,
   input: PurchaseInput,
@@ -163,7 +171,6 @@ const executeLlmWithRetry = async (
         : ''
 
     const { data, error } = await attemptLlmCall(
-      openaiApiKey,
       systemPrompt,
       userPrompt,
       retryContext
@@ -295,7 +302,6 @@ const processLlmResponse = (
 }
 
 export const evaluateWithLlm = async (
-  openaiApiKey: string,
   input: PurchaseInput,
   context: EvaluationContext
 ): Promise<EvaluationResult> => {
@@ -313,7 +319,6 @@ export const evaluateWithLlm = async (
 
   try {
     const llmResponse = await executeLlmWithRetry(
-      openaiApiKey,
       systemPrompt,
       userPrompt,
       input,
@@ -331,18 +336,5 @@ export const evaluateWithLlm = async (
       reasoning: { ...fallback.reasoning, algorithm: 'heuristic_fallback' as const },
       fallbackReason: errorMessage,
     }
-  }
-}
-
-export const evaluateWithFallback = (
-  input: PurchaseInput,
-  context: EvaluationContext
-): EvaluationResult => {
-  logger.warn('No OpenAI API key provided, using fallback evaluation')
-  const fallback = evaluatePurchaseFallback(input, buildFallbackOverrides(context))
-  return {
-    ...fallback,
-    reasoning: { ...fallback.reasoning, algorithm: 'heuristic_fallback' as const },
-    fallbackReason: 'No API key configured',
   }
 }
