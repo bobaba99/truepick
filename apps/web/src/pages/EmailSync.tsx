@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
 import { GmailLogo, OutlookLogo } from '../components/EmailIcons'
@@ -20,6 +20,7 @@ import {
 import { importOutlookReceipts } from '../api/email/importOutlook'
 import { startOutlookOAuth, exchangeCodeForTokens, refreshOutlookToken } from '../api/email/outlookAuth'
 import { useUserFormatting } from '../preferences/UserPreferencesContext'
+import { useAnalytics } from '../hooks/useAnalytics'
 
 type EmailSyncProps = {
   session: Session | null
@@ -50,6 +51,8 @@ const getProviderFromSource = (source: string): EmailProvider | null => {
 
 export default function EmailSync({ session }: EmailSyncProps) {
   const { formatCurrency, formatDate } = useUserFormatting()
+  const analytics = useAnalytics()
+  const importStartRef = useRef<number>(0)
   const [connection, setConnection] = useState<EmailConnectionRow | null>(null)
   const [status, setStatus] = useState<Status>({ type: 'idle' })
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -126,6 +129,8 @@ export default function EmailSync({ session }: EmailSyncProps) {
       return
     }
 
+    analytics.trackEmailOauthStarted('gmail')
+
     // Build OAuth URL
     const redirectUri = `${window.location.origin}/email-sync`
     const params = new URLSearchParams({
@@ -146,13 +151,15 @@ export default function EmailSync({ session }: EmailSyncProps) {
       setStatus({ type: 'error', message: 'Microsoft Client ID not configured' })
       return
     }
+    analytics.trackEmailOauthStarted('outlook')
     try {
       await startOutlookOAuth(MICROSOFT_CLIENT_ID)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start OAuth'
+      analytics.trackEmailOauthError('outlook', message)
       setStatus({ type: 'error', message })
     }
-  }, [])
+  }, [analytics])
 
   // Handle OAuth callback (access token in URL hash)
   useEffect(() => {
@@ -180,8 +187,10 @@ export default function EmailSync({ session }: EmailSyncProps) {
         expiresAt,
       }).then(({ error }) => {
         if (error) {
+          analytics.trackEmailOauthError('gmail', error)
           setStatus({ type: 'error', message: error })
         } else {
+          analytics.trackEmailOauthCompleted('gmail')
           setStatus({ type: 'success', message: 'Gmail connected successfully!' })
           loadConnectionData()
         }
@@ -201,6 +210,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
     if (oauthError) {
       const errorDesc = params.get('error_description') ?? oauthError
       window.history.replaceState(null, '', window.location.pathname)
+      analytics.trackEmailOauthError('outlook', errorDesc)
       setStatus({ type: 'error', message: `Outlook auth failed: ${errorDesc}` })
       return
     }
@@ -224,14 +234,17 @@ export default function EmailSync({ session }: EmailSyncProps) {
       )
       .then(({ error }) => {
         if (error) {
+          analytics.trackEmailOauthError('outlook', error)
           setStatus({ type: 'error', message: error })
         } else {
+          analytics.trackEmailOauthCompleted('outlook')
           setStatus({ type: 'success', message: 'Outlook connected successfully!' })
           loadConnectionData()
         }
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Token exchange failed'
+        analytics.trackEmailOauthError('outlook', message)
         setStatus({ type: 'error', message })
       })
   }, [userId, loadConnectionData])
@@ -283,9 +296,11 @@ export default function EmailSync({ session }: EmailSyncProps) {
             refreshToken: refreshed.refreshToken,
             expiresAt: refreshed.expiresAt,
           })
+          analytics.trackEmailTokenRefresh('outlook', true)
           accessToken = refreshed.accessToken
           loadConnectionData()
         } catch (err) {
+          analytics.trackEmailTokenRefresh('outlook', false)
           const message = err instanceof Error ? err.message : 'Token refresh failed'
           setStatus({ type: 'error', message: `Token expired and refresh failed: ${message}. Please reconnect Outlook.` })
           return
@@ -301,6 +316,8 @@ export default function EmailSync({ session }: EmailSyncProps) {
 
     setIsImporting(true)
     setStatus({ type: 'loading', message: 'Scanning emails for receipts...' })
+    analytics.trackEmailImportStarted(provider)
+    importStartRef.current = Date.now()
 
     try {
       const importFn =
@@ -315,6 +332,15 @@ export default function EmailSync({ session }: EmailSyncProps) {
           maxMessages: 10,
           sinceDays: 90,
         }
+      )
+
+      const durationMs = Date.now() - importStartRef.current
+      analytics.trackEmailImportDuration(durationMs, provider)
+      analytics.trackEmailImportCompleted(
+        provider,
+        result.imported.length,
+        result.skipped,
+        result.errors.length,
       )
 
       setImportResult(result)
@@ -347,6 +373,7 @@ export default function EmailSync({ session }: EmailSyncProps) {
       const message = isAuthError
         ? `${providerName} connection expired. Please disconnect and reconnect.`
         : raw
+      analytics.trackEmailImportError(provider, isAuthError ? 'auth_expired' : raw)
       setStatus({ type: 'error', message })
     } finally {
       setIsImporting(false)
