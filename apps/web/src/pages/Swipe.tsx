@@ -4,6 +4,7 @@ import type { SwipeOutcome, SwipeQueueItem, SwipeTiming } from '../api/core/type
 import { getUnratedPurchases, createSwipe, deleteSwipe } from '../api/purchase/swipeService'
 import { GlassCard, LiquidButton } from '../components/Kinematics'
 import { useUserFormatting } from '../preferences/UserPreferencesContext'
+import { useAnalytics } from '../hooks/useAnalytics'
 
 type SwipeProps = {
   session: Session | null
@@ -145,6 +146,8 @@ function SwipeableQueueCard({
 
 export default function Swipe({ session }: SwipeProps) {
   const { formatCurrency, formatDate } = useUserFormatting()
+  const analytics = useAnalytics()
+  const loadStartRef = useRef<number>(0)
   const [purchases, setPurchases] = useState<SwipeQueueItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -203,6 +206,19 @@ export default function Swipe({ session }: SwipeProps) {
         return
       }
 
+      const purchaseAgeDays = Math.max(
+        0,
+        Math.round(
+          (Date.now() - new Date(item.purchase.purchase_date).getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+      analytics.trackSwipeCompleted({
+        direction: outcome === 'satisfied' ? 'right' : outcome === 'regret' ? 'left' : 'down',
+        outcome,
+        purchaseAgeDays,
+      })
+
       // Remove from purchases after animation completes
       setTimeout(() => {
         setPurchases((prev) => prev.filter((p) => p.schedule_id !== item.schedule_id))
@@ -222,9 +238,11 @@ export default function Swipe({ session }: SwipeProps) {
     setLoading(true)
     setStatus('')
     clearLastSwipe()
+    loadStartRef.current = Date.now()
 
     try {
       const data = await getUnratedPurchases(session.user.id, { includeFuture: true })
+      analytics.trackSwipeLoadDuration(Date.now() - loadStartRef.current, data.length)
       setPurchases(data)
       setCurrentIndex(0)
     } catch {
@@ -232,7 +250,7 @@ export default function Swipe({ session }: SwipeProps) {
     } finally {
       setLoading(false)
     }
-  }, [session, clearLastSwipe])
+  }, [session, clearLastSwipe, analytics])
 
   useEffect(() => {
     void loadUnratedPurchases()
@@ -260,6 +278,7 @@ export default function Swipe({ session }: SwipeProps) {
   const progress = totalDue > 0 ? (currentIndex / totalDue) * 100 : 0
 
   const handleFilterChange = (mode: SwipeFilterMode) => {
+    analytics.trackFilterApplied('swipe', mode)
     setViewMode(mode)
   }
 
@@ -331,6 +350,7 @@ export default function Swipe({ session }: SwipeProps) {
     setUndoing(true)
     clearUndoTimer()
 
+    const originalOutcome = lastSwipe.outcome
     const { error } = await deleteSwipe(session.user.id, lastSwipe.scheduleId)
 
     if (error) {
@@ -339,10 +359,11 @@ export default function Swipe({ session }: SwipeProps) {
       return
     }
 
+    analytics.trackSwipeUndone(originalOutcome)
     setCurrentIndex((prev) => Math.max(0, prev - 1))
     setLastSwipe(null)
     setUndoing(false)
-  }, [session, lastSwipe, undoing, clearUndoTimer])
+  }, [session, lastSwipe, undoing, clearUndoTimer, analytics])
 
   const handleSwipe = useCallback(
     async (outcome: SwipeOutcome) => {
@@ -383,6 +404,19 @@ export default function Swipe({ session }: SwipeProps) {
         setSwipeDirection(null)
         return
       }
+
+      const purchaseAgeDays = Math.max(
+        0,
+        Math.round(
+          (Date.now() - new Date(currentPurchase.purchase_date).getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+      analytics.trackSwipeCompleted({
+        direction: outcome === 'satisfied' ? 'right' : outcome === 'regret' ? 'left' : 'down',
+        outcome,
+        purchaseAgeDays,
+      })
 
       // Brief delay for animation, then update state
       const animationDelay = outcome === 'not_sure' ? 2000 : 300
@@ -528,6 +562,21 @@ export default function Swipe({ session }: SwipeProps) {
       handleNotSure()
     }
   }, [swiping, handleRegret, handleSatisfied, handleNotSure])
+
+  // Track empty states
+  const emptyStateTrackedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading) return
+    const stateType = purchases.length === 0
+      ? 'no_purchases'
+      : !currentPurchase
+        ? 'all_rated'
+        : null
+    if (stateType && emptyStateTrackedRef.current !== stateType) {
+      emptyStateTrackedRef.current = stateType
+      analytics.trackEmptyStateShown('swipe', stateType)
+    }
+  }, [loading, purchases.length, currentPurchase, analytics])
 
   // Cleanup timer on unmount
   useEffect(() => {
