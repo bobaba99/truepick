@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import type { Stats, VerdictRow, PurchaseMotivation } from '../api/core/types'
 import { PURCHASE_CATEGORIES, PURCHASE_MOTIVATIONS } from '../api/core/types'
@@ -18,9 +18,10 @@ import {
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import VerdictShareModal from '../components/VerdictShareModal'
 import EvaluatingModal from '../components/EvaluatingModal'
+import PaywallModal from '../components/PaywallModal'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
 import { useUserFormatting, useUserPreferences } from '../preferences/UserPreferencesContext'
-import { analytics } from '../hooks/useAnalytics'
+import { analytics, bucketPrice } from '../hooks/useAnalytics'
 
 type DashboardProps = {
   session: Session | null
@@ -30,11 +31,13 @@ export default function Dashboard({ session }: DashboardProps) {
   const { preferences } = useUserPreferences()
   const { formatCurrency, formatDateTime } = useUserFormatting()
 
+  const navigate = useNavigate()
   const formStartRef = useRef<number | null>(null)
   const formFieldsRef = useRef<Set<string>>(new Set())
   const formSubmittedRef = useRef(false)
   const evalStartRef = useRef<number>(0)
   const regenStartRef = useRef<number>(0)
+  const sessionVerdictsCountRef = useRef<number>(0)
   const [stats, setStats] = useState<Stats>({
     swipesCompleted: 0,
     regretRate: 0,
@@ -58,6 +61,9 @@ export default function Dashboard({ session }: DashboardProps) {
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [statusType, setStatusType] = useState<'error' | 'info'>('error')
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [verdictsUsedToday, setVerdictsUsedToday] = useState(0)
+  const [verdictsRemainingToday, setVerdictsRemainingToday] = useState<number | null>(null)
   const generationLockMessage =
     'Another verdict is currently being generated or regenerated. Please wait for it to finish.'
 
@@ -139,7 +145,13 @@ export default function Dashboard({ session }: DashboardProps) {
     setSubmitting(true)
     setStatus('')
     setStatusType('error')
-    analytics.trackVerdictEvalStarted()
+    analytics.trackVerdictRequested({
+      product_category: category || 'other',
+      price_range: bucketPrice(priceValue),
+      input_method: 'manual',
+      user_tier: 'free',
+      verdicts_remaining_today: verdictsRemainingToday,
+    })
     evalStartRef.current = Date.now()
 
     const input = {
@@ -168,12 +180,22 @@ export default function Dashboard({ session }: DashboardProps) {
         setStatusType('info')
       }
 
-      const { error } = await submitVerdict(session.user.id, input, evaluation)
+      const { data: submittedVerdict, error } = await submitVerdict(session.user.id, input, evaluation)
 
       if (error) {
         setStatus(error)
         setStatusType('error')
         return
+      }
+
+      if (submittedVerdict) {
+        sessionVerdictsCountRef.current += 1
+        analytics.trackVerdictDelivered({
+          verdict_outcome: evaluation.outcome ?? 'unknown',
+          confidence_score: evaluation.confidence ?? null,
+          response_latency_ms: Date.now() - evalStartRef.current,
+          verdict_id: submittedVerdict.id,
+        })
       }
 
       const decisionTimeSeconds = formStartRef.current
@@ -190,6 +212,25 @@ export default function Dashboard({ session }: DashboardProps) {
       await loadStats()
       await loadRecentVerdicts()
     } catch (error) {
+      // Check for paywall (daily limit) error thrown from verdictLLM
+      if (
+        error instanceof Error &&
+        error.message === 'daily_limit_reached' &&
+        'paywallData' in error
+      ) {
+        const paywallData = (error as Error & { paywallData: Record<string, unknown> }).paywallData
+        const usedToday = (paywallData.verdicts_used_today as number | undefined) ?? 3
+        setVerdictsUsedToday(usedToday)
+        setVerdictsRemainingToday(0)
+        analytics.trackPaywallHit({
+          verdicts_used_today: usedToday,
+          session_verdicts_count: sessionVerdictsCountRef.current,
+          time_of_day: new Date().getUTCHours(),
+          day_of_week: new Date().getUTCDay(),
+        })
+        setPaywallOpen(true)
+        return
+      }
       logger.error('Evaluation failed', { error: error instanceof Error ? error.message : String(error) })
       analytics.trackVerdictEvalError(error instanceof Error ? error.message : 'unknown')
       setStatus('Something went wrong while evaluating. Please try again.')
@@ -222,6 +263,19 @@ export default function Dashboard({ session }: DashboardProps) {
     }
 
     analytics.trackVerdictDecision(decision, verdictAgeSeconds)
+
+    const isOverride =
+      (verdict?.predicted_outcome === 'buy' && decision === 'skip') ||
+      (verdict?.predicted_outcome === 'skip' && decision === 'bought')
+    if (isOverride && verdict) {
+      analytics.trackVerdictOverride({
+        verdict_id: verdictId,
+        original_verdict: verdict.predicted_outcome ?? 'unknown',
+        user_action: decision === 'skip' ? 'skipped_anyway' : 'bought_anyway',
+        time_since_verdict_ms: verdictAgeSeconds * 1000,
+      })
+    }
+
     await loadStats()
     await loadRecentVerdicts()
     setVerdictSavingId(null)
@@ -627,6 +681,18 @@ export default function Dashboard({ session }: DashboardProps) {
 
       {createPortal(
         <EvaluatingModal isOpen={submitting || verdictRegeneratingId !== null} />,
+        document.body
+      )}
+
+      {paywallOpen && createPortal(
+        <PaywallModal
+          isOpen={paywallOpen}
+          onClose={() => setPaywallOpen(false)}
+          onSignUp={() => { setPaywallOpen(false); navigate('/auth') }}
+          verdictsUsedToday={verdictsUsedToday}
+          dailyLimit={3}
+          isAnonymous={session?.user.is_anonymous ?? false}
+        />,
         document.body
       )}
     </section>

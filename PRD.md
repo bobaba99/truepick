@@ -94,7 +94,7 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 
 | ID | User Story | Priority | Acceptance Criteria |
 |----|------------|----------|---------------------|
-| FR-001 | As a visitor, I want to enter a product name, price, and my reason for buying so that I receive a buy/skip verdict without creating an account. | High | Verdict form accepts product name (text, required), price (numeric, required), and reason (text, optional, max 280 chars). Submitting returns a verdict within 3 seconds. No login required. |
+| FR-001 | As a visitor, I want to enter a product name, price, and my reason for buying so that I receive a buy/skip verdict without creating an account. | High | **Implemented.** Verdict form accepts product name (text, required), price (numeric, required), and reason (text, optional, max 280 chars). Submitting returns a verdict within 3 seconds. Visitors are silently signed in anonymously (`signInAnonymously`) on first visit — no account creation required. Free tier is capped at 3 verdicts/day; hitting the cap shows the PaywallModal. |
 | FR-002 | As a visitor, I want to see the reasoning behind my verdict so that I understand why the app recommended buy or skip. | High | Verdict response displays: verdict label (Buy / Skip / Hold), a 2-4 sentence explanation referencing purchase quality signals (price-to-value, impulse indicators, necessity), and a confidence indicator (e.g., low/medium/high). |
 | FR-003 | As a visitor, I want to receive a verdict that evaluates impulse indicators so that I can identify when I am making an emotionally driven purchase. | High | LLM system prompt includes heuristics for: time pressure language, emotional justification patterns, comparison to recent similar purchases (if profile exists), and financial impact ratio (price relative to stated income/budget if available). |
 | FR-004 | As a visitor, I want to submit another verdict immediately after receiving one so that I can evaluate multiple purchases in a session. | Medium | After verdict display, a clear "Evaluate another purchase" CTA resets the form. No session limit on the web app MVP. |
@@ -106,7 +106,7 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 |----|------------|----------|---------------------|
 | FR-006 | As a visitor, I want to optionally complete a short values questionnaire so that my verdicts become personalized to what I care about. | High | Profile form presents 5 questions covering: spending priorities (e.g., durability vs. convenience vs. experience), financial goals, and impulse sensitivity self-assessment. Completable in under 2 minutes. Stored in local storage (no account required). |
 | FR-007 | As a profiled user, I want my verdicts to reference my stated values so that recommendations feel personally relevant, not generic. | High | When profile data exists, verdict reasoning explicitly references user stated values (e.g., "You said you prioritize experiences over things - this does not align with that goal"). Verdicts without a profile use general purchase quality signals only. |
-| FR-008 | As a visitor, I want to create an account (email or OAuth) so that my profile and verdict history persist across devices. | Medium | Account creation via email/password or Google OAuth. Profile data and verdict history sync to account. Account creation is prompted after 3rd verdict but never blocks access. |
+| FR-008 | As a visitor, I want to create an account (email or OAuth) so that my profile and verdict history persist across devices. | Medium | **Partially implemented.** Account creation via email/password. Anonymous sessions auto-created on first visit; signing up via the auth form converts the anonymous account to permanent using `updateUser()`, preserving all verdict history. Google OAuth not yet implemented. |
 | FR-009 | As a returning user, I want my previous verdicts to inform future recommendations so that the app learns my patterns. | Medium | Backend stores verdict history per user. LLM prompt includes summary of past verdicts (categories, regret patterns) when generating new verdicts. Minimum 3 past verdicts before pattern-based personalization activates. |
 | FR-010 | As a profiled user, I want to edit my values profile at any time so that changes in my priorities are reflected in future verdicts. | Low | Profile edit accessible from settings. Changes take effect on next verdict. Previous verdicts are not retroactively updated. |
 
@@ -123,7 +123,7 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 | ID | User Story | Priority | Acceptance Criteria |
 |----|------------|----------|---------------------|
 | FR-014 | As a product owner, I need every verdict to be logged with structured data so that I can train a prediction model on real user data. | High | Each verdict record stores: unique ID, timestamp, product name, price, category (LLM-determined), user reason, profile data snapshot (if available), LLM verdict, LLM confidence, LLM reasoning, and a nullable outcome field for follow-up. |
-| FR-015 | As a product owner, I need verdict records linked to user accounts (when available) so that I can track per-user patterns over time. | High | Verdicts created by authenticated users include `user_id` foreign key. Anonymous verdicts store a session identifier for potential later account linking. |
+| FR-015 | As a product owner, I need verdict records linked to user accounts (when available) so that I can track per-user patterns over time. | High | **Implemented.** All verdicts — including guest sessions — include a `user_id` via Supabase anonymous auth. When the user later converts to a permanent account, the `user_id` is preserved so no history is lost. |
 | FR-016 | As a returning user, I want to report whether I bought the product and whether I regret it so that the app learns from my outcomes. | Medium | Follow-up prompt appears in verdict history after 7 days: "Did you buy [product]? How do you feel about it?" Stores: purchased (yes/no), outcome (satisfied/regret/neutral). Links to original verdict record. |
 | FR-017 | As a product owner, I need all LLM API calls logged with input/output tokens and latency so that I can monitor costs and performance. | Medium | Each verdict logs: model used, input token count, output token count, API latency (ms), estimated cost. Accessible in admin dashboard. |
 
@@ -155,8 +155,9 @@ Secondary users are adjacent groups who may not identify as impulse spenders but
 - 99.5% uptime; LLM fallback activates within 5s of primary timeout
 
 **Security**
-- LLM API keys in env vars / secrets manager only, never in frontend bundle or git
-- Rate limiting: 10 verdicts/hour anonymous, 30/hour authenticated
+
+- LLM API keys in env vars / secrets manager only, never in frontend bundle or git — **Implemented** (all LLM calls proxied through `apps/api`)
+- Rate limiting: 20 requests/min per user via `rateLimitLLM` middleware; daily verdict cap of 3/day for free tier via `checkDailyVerdictLimit` middleware — **Implemented**
 - Supabase handles encryption at rest, TLS, and auth (bcrypt/JWT)
 
 **Compliance**

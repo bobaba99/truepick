@@ -3,14 +3,12 @@
 .env.local
 .env.*.local
 
-# Important docs
+# Important docs (progress.md and DEBT.md are NEVER ignored — see CLAUDE.md critical rules)
 doc/
 FREEMIUM_FEATURES.md
 Freemium_features.md
-progress.md
 SCALE.md
 CLAUDE.md
-DEBT.md
 
 # Propriatory formula
 formula/

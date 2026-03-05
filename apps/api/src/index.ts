@@ -3,6 +3,7 @@ import cors from 'cors'
 import multer from 'multer'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
+import { PostHog } from 'posthog-node'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -18,6 +19,20 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
   .filter(Boolean)
 
 const openaiApiKey = process.env.OPENAI_API_KEY ?? ''
+
+const posthog = new PostHog(process.env.POSTHOG_API_KEY ?? '', {
+  host: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
+  enableExceptionAutocapture: true,
+})
+
+process.on('SIGINT', async () => {
+  await posthog.shutdown()
+  process.exit(0)
+})
+process.on('SIGTERM', async () => {
+  await posthog.shutdown()
+  process.exit(0)
+})
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 
@@ -51,6 +66,10 @@ const requireAuth = async (
     id: user.id,
     email: user.email ?? '',
   }
+  posthog.identify({
+    distinctId: user.id,
+    properties: { email: user.email ?? '' },
+  })
   next()
 }
 
@@ -75,6 +94,11 @@ const rateLimitLLM = (
   )
 
   if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+    posthog.capture({
+      distinctId: userId,
+      event: 'rate_limit_exceeded',
+      properties: { endpoint: req.path, limit: RATE_LIMIT_MAX_REQUESTS, window_ms: RATE_LIMIT_WINDOW_MS },
+    })
     res.status(429).json({
       error: 'Rate limit exceeded. Please wait a moment before trying again.',
     })
@@ -97,6 +121,61 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000)
+
+const DAILY_VERDICT_LIMIT_FREE = 3
+
+const checkDailyVerdictLimit = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): Promise<void> => {
+  const user = (req as AuthenticatedRequest).authUser
+  const sb = supabase()
+  const { data: userRow } = await sb
+    .from('users')
+    .select('tier')
+    .eq('id', user.id)
+    .single()
+
+  // Anonymous users (no row in users table) default to free
+  const tier = userRow?.tier ?? 'free'
+  if (tier === 'premium') {
+    next()
+    return
+  }
+
+  // Count today's verdicts (UTC day boundary)
+  const todayUtc = new Date()
+  todayUtc.setUTCHours(0, 0, 0, 0)
+  const { count } = await sb
+    .from('verdicts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .gte('created_at', todayUtc.toISOString())
+
+  const usedToday = count ?? 0
+  if (usedToday >= DAILY_VERDICT_LIMIT_FREE) {
+    posthog.capture({
+      distinctId: user.id,
+      event: 'paywall_hit',
+      properties: {
+        verdicts_used_today: usedToday,
+        time_of_day: new Date().getUTCHours(),
+        day_of_week: new Date().getUTCDay(),
+      },
+    })
+    res.status(429).json({
+      error: 'daily_limit_reached',
+      verdicts_remaining: 0,
+      verdicts_used_today: usedToday,
+      daily_limit: DAILY_VERDICT_LIMIT_FREE,
+    })
+    return
+  }
+
+  res.locals.verdictsUsedToday = usedToday
+  next()
+}
 
 const requireAdmin = async (
   req: express.Request,
@@ -234,6 +313,11 @@ app.post('/admin/resources', requireAdmin, async (req, res) => {
     res.status(500).json({ error: error.message })
     return
   }
+  posthog.capture({
+    distinctId: adminUser.id,
+    event: 'resource_created',
+    properties: { resource_id: data.id, slug: body.slug.trim(), title: body.title.trim(), is_published: body.isPublished ?? false, tag_count: body.tags.length },
+  })
   res.json({ data: toDbRow(data) })
 })
 
@@ -290,11 +374,17 @@ app.put('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
     res.status(500).json({ error: error.message })
     return
   }
+  posthog.capture({
+    distinctId: adminUser.id,
+    event: 'resource_updated',
+    properties: { resource_id: resourceId, slug: body.slug.trim(), title: body.title.trim(), is_published: body.isPublished ?? false },
+  })
   res.json({ data: toDbRow(data) })
 })
 
 app.post('/admin/resources/:resourceId/publish', requireAdmin, async (req, res) => {
   const { resourceId } = req.params
+  const adminUser = (req as express.Request & { adminUser: { id: string } }).adminUser
   const now = new Date().toISOString()
 
   const { data, error } = await supabase()
@@ -308,11 +398,17 @@ app.post('/admin/resources/:resourceId/publish', requireAdmin, async (req, res) 
     res.status(500).json({ error: error.message })
     return
   }
+  posthog.capture({
+    distinctId: adminUser.id,
+    event: 'resource_published',
+    properties: { resource_id: resourceId, slug: data.slug, title: data.title },
+  })
   res.json({ data: toDbRow(data) })
 })
 
 app.post('/admin/resources/:resourceId/unpublish', requireAdmin, async (req, res) => {
   const { resourceId } = req.params
+  const adminUser = (req as express.Request & { adminUser: { id: string } }).adminUser
 
   const { data, error } = await supabase()
     .from('resources')
@@ -325,11 +421,17 @@ app.post('/admin/resources/:resourceId/unpublish', requireAdmin, async (req, res
     res.status(500).json({ error: error.message })
     return
   }
+  posthog.capture({
+    distinctId: adminUser.id,
+    event: 'resource_unpublished',
+    properties: { resource_id: resourceId, slug: data.slug, title: data.title },
+  })
   res.json({ data: toDbRow(data) })
 })
 
 app.delete('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
   const { resourceId } = req.params
+  const adminUser = (req as express.Request & { adminUser: { id: string } }).adminUser
 
   const { error } = await supabase()
     .from('resources')
@@ -340,6 +442,11 @@ app.delete('/admin/resources/:resourceId', requireAdmin, async (req, res) => {
     res.status(500).json({ error: error.message })
     return
   }
+  posthog.capture({
+    distinctId: adminUser.id,
+    event: 'resource_deleted',
+    properties: { resource_id: resourceId },
+  })
   res.status(204).send()
 })
 
@@ -350,6 +457,7 @@ app.post(
   requireAdmin,
   upload.single('image'),
   async (req, res) => {
+    const adminUser = (req as express.Request & { adminUser: { id: string } }).adminUser
     const file = req.file
     if (!file) {
       res.status(400).json({ error: 'No image file provided.' })
@@ -377,6 +485,11 @@ app.post(
     }
 
     const { data: urlData } = supabase().storage.from(RESOURCE_IMAGES_BUCKET).getPublicUrl(data.path)
+    posthog.capture({
+      distinctId: adminUser.id,
+      event: 'image_uploaded',
+      properties: { mime_type: file.mimetype, file_size: file.size },
+    })
     res.json({ url: urlData.publicUrl })
   }
 )
@@ -387,7 +500,7 @@ app.post(
 
 const LLM_TIMEOUT_MS = 60_000
 
-app.post('/api/verdict/evaluate', requireAuth, rateLimitLLM, async (req, res) => {
+app.post('/api/verdict/evaluate', requireAuth, checkDailyVerdictLimit, rateLimitLLM, async (req, res) => {
   if (!openaiApiKey) {
     res.status(500).json({ error: 'OpenAI API key not configured on server.' })
     return
@@ -399,6 +512,7 @@ app.post('/api/verdict/evaluate', requireAuth, rateLimitLLM, async (req, res) =>
     model?: string
     maxTokens?: number
   }
+  const userId = (req as AuthenticatedRequest).authUser.id
 
   if (!systemPrompt || !userPrompt) {
     res.status(400).json({ error: 'systemPrompt and userPrompt are required.' })
@@ -425,6 +539,11 @@ app.post('/api/verdict/evaluate', requireAuth, rateLimitLLM, async (req, res) =>
 
     if (!response.ok) {
       const errorBody = await response.text()
+      posthog.capture({
+        distinctId: userId,
+        event: 'verdict_eval_failed',
+        properties: { model: model ?? 'gpt-5-nano', status_code: response.status, reason: 'openai_error' },
+      })
       res.status(response.status).json({
         error: `OpenAI API error: ${response.status}`,
         details: errorBody,
@@ -433,17 +552,78 @@ app.post('/api/verdict/evaluate', requireAuth, rateLimitLLM, async (req, res) =>
     }
 
     const data = await response.json()
-    res.json(data)
+    posthog.capture({
+      distinctId: userId,
+      event: 'verdict_evaluated',
+      properties: { model: model ?? 'gpt-5-nano', max_tokens: maxTokens ?? 4000 },
+    })
+    const usedToday = (res.locals.verdictsUsedToday as number | undefined) ?? 0
+    const verdicts_remaining = Math.max(0, DAILY_VERDICT_LIMIT_FREE - (usedToday + 1))
+    res.json({ ...data, verdicts_remaining })
   } catch (error) {
     if (error instanceof Error && error.name === 'TimeoutError') {
+      posthog.capture({
+        distinctId: userId,
+        event: 'verdict_eval_failed',
+        properties: { model: model ?? 'gpt-5-nano', reason: 'timeout' },
+      })
       res.status(504).json({ error: 'OpenAI request timed out.' })
       return
     }
+    posthog.captureException(error, userId, { endpoint: '/api/verdict/evaluate' })
+    posthog.capture({
+      distinctId: userId,
+      event: 'verdict_eval_failed',
+      properties: { model: model ?? 'gpt-5-nano', reason: 'unknown_error' },
+    })
     res.status(500).json({
       error: 'Failed to call OpenAI API.',
       details: error instanceof Error ? error.message : String(error),
     })
   }
+})
+
+// FUTURE: POST /api/webhooks/stripe
+// On event 'checkout.session.completed':
+//   posthog.capture({
+//     distinctId: event.data.object.metadata.user_id,
+//     event: 'paywall_conversion_completed',
+//     properties: {
+//       trigger_context: event.data.object.metadata.trigger_context ?? 'unknown',
+//       verdicts_at_conversion: Number(event.data.object.metadata.verdicts_at_conversion) || null,
+//     },
+//   })
+// Requires: trigger_context + verdicts_at_conversion in Stripe checkout metadata.
+
+app.post('/api/waitlist', async (req, res) => {
+  const { email, verdicts_at_signup } = req.body as { email?: string; verdicts_at_signup?: number }
+
+  if (!email?.trim()) {
+    res.status(400).json({ error: 'email is required.' })
+    return
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email.trim())) {
+    res.status(400).json({ error: 'Invalid email address.' })
+    return
+  }
+
+  const { error } = await supabase()
+    .from('waitlist')
+    .insert({ email: email.trim().toLowerCase(), verdicts_at_signup: verdicts_at_signup ?? null })
+
+  if (error) {
+    if (error.code === '23505') {
+      // Already on waitlist — treat as success to avoid enumeration
+      res.json({ success: true })
+      return
+    }
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.json({ success: true })
 })
 
 app.post('/api/embeddings/search', requireAuth, rateLimitLLM, async (req, res) => {
@@ -453,6 +633,7 @@ app.post('/api/embeddings/search', requireAuth, rateLimitLLM, async (req, res) =
   }
 
   const { inputs } = req.body as { inputs: string[] }
+  const userId = (req as AuthenticatedRequest).authUser.id
 
   if (!Array.isArray(inputs) || inputs.length === 0) {
     res.status(400).json({ error: 'inputs must be a non-empty array of strings.' })
@@ -482,8 +663,14 @@ app.post('/api/embeddings/search', requireAuth, rateLimitLLM, async (req, res) =
     }
 
     const data = await response.json()
+    posthog.capture({
+      distinctId: userId,
+      event: 'embeddings_searched',
+      properties: { input_count: inputs.length },
+    })
     res.json(data)
   } catch (error) {
+    posthog.captureException(error, userId, { endpoint: '/api/embeddings/search' })
     res.status(500).json({
       error: 'Failed to call OpenAI embeddings API.',
       details: error instanceof Error ? error.message : String(error),
@@ -539,6 +726,7 @@ app.post('/api/email/parse-receipt', requireAuth, rateLimitLLM, async (req, res)
     contentLimit?: number
     maxOutputTokens?: number
   }
+  const userId = (req as AuthenticatedRequest).authUser.id
 
   if (!emailText || !sender || !subject || !emailDate) {
     res.status(400).json({
@@ -565,6 +753,11 @@ app.post('/api/email/parse-receipt', requireAuth, rateLimitLLM, async (req, res)
     })
 
     if (response.error) {
+      posthog.capture({
+        distinctId: userId,
+        event: 'receipt_parse_failed',
+        properties: { reason: 'openai_parse_error', details: response.error.message },
+      })
       res.status(500).json({
         error: 'OpenAI parsing failed.',
         details: response.error.message,
@@ -573,6 +766,11 @@ app.post('/api/email/parse-receipt', requireAuth, rateLimitLLM, async (req, res)
     }
 
     if (response.incomplete_details?.reason) {
+      posthog.capture({
+        distinctId: userId,
+        event: 'receipt_parse_failed',
+        properties: { reason: 'incomplete_response', details: response.incomplete_details.reason },
+      })
       res.status(422).json({
         error: 'OpenAI response incomplete.',
         details: response.incomplete_details.reason,
@@ -581,20 +779,42 @@ app.post('/api/email/parse-receipt', requireAuth, rateLimitLLM, async (req, res)
     }
 
     const content = response.output_text?.trim() ?? ''
+    posthog.capture({
+      distinctId: userId,
+      event: 'receipt_parsed',
+      properties: { email_date: emailDate, content_truncated: emailText.length > limit },
+    })
     res.json({ content })
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
+      posthog.capture({
+        distinctId: userId,
+        event: 'receipt_parse_failed',
+        properties: { reason: 'openai_api_error', status_code: error.status },
+      })
       res.status(error.status ?? 500).json({
         error: 'OpenAI API error.',
         details: error.message,
       })
       return
     }
+    posthog.captureException(error, userId, { endpoint: '/api/email/parse-receipt' })
+    posthog.capture({
+      distinctId: userId,
+      event: 'receipt_parse_failed',
+      properties: { reason: 'unknown_error' },
+    })
     res.status(500).json({
       error: 'Failed to parse receipt.',
       details: error instanceof Error ? error.message : String(error),
     })
   }
+})
+
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const userId = (req as AuthenticatedRequest).authUser?.id ?? 'anonymous'
+  posthog.captureException(err, userId, { endpoint: req.path, method: req.method })
+  res.status(500).json({ error: 'Internal server error.' })
 })
 
 app.listen(PORT, () => {

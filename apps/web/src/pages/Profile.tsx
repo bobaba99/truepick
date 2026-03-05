@@ -651,6 +651,19 @@ export default function Profile({ session }: ProfileProps) {
     }
 
     analytics.trackVerdictDecision(decision, verdictAgeSeconds)
+
+    const isOverride =
+      (verdict?.predicted_outcome === 'buy' && decision === 'skip') ||
+      (verdict?.predicted_outcome === 'skip' && decision === 'bought')
+    if (isOverride && verdict) {
+      analytics.trackVerdictOverride({
+        verdict_id: verdictId,
+        original_verdict: verdict.predicted_outcome ?? 'unknown',
+        user_action: decision === 'skip' ? 'skipped_anyway' : 'bought_anyway',
+        time_since_verdict_ms: verdictAgeSeconds * 1000,
+      })
+    }
+
     await loadVerdicts()
     await loadPurchases()
     setVerdictSavingId(null)

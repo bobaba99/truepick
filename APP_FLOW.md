@@ -4,7 +4,7 @@
 
 ### Free tier (web app)
 
-User registers, completes the onboarding quiz to profile spending tendencies, and receives up to **3 AI verdicts per week** with limited rationale depth. Educational resources are available to all free users. The free tier builds habit and trust — no analytics, no behavioral tracking, just the core decision tool.
+Visitors are silently signed in anonymously on first visit (no account creation required). Registered users complete the onboarding quiz to profile spending tendencies. All users (anonymous and registered) receive up to **3 AI verdicts per day**; hitting the cap shows the PaywallModal with a premium waitlist CTA. Educational resources are available to all users. The free tier builds habit and trust — no analytics, no behavioral tracking, just the core decision tool.
 
 ### Premium tier
 
@@ -29,6 +29,20 @@ Through URL from Google search or social media handles.
 ---
 
 ## 3. Authentication Flow
+
+### 3.0 Guest / Anonymous Flow
+
+On first visit, the app silently calls `signInAnonymously()` (Supabase anon auth). No action required from the visitor. The anonymous session persists in localStorage so returning guests retain their verdict history. Guests receive the full verdict experience (up to 3/day cap) with no profile onboarding.
+
+```
+[Landing Page] → [Auto anonymous sign-in] → [Dashboard] → [Verdict (up to 3/day)]
+```
+
+When an anonymous user hits the daily cap, `PaywallModal` appears with a premium waitlist CTA and an option to create a free account. Registering via the auth form calls `updateUser({ email, password })`, which **preserves the anonymous `user_id`** — all existing verdict history is retained.
+
+```
+[PaywallModal] → [Sign up / Convert] → [Dashboard] (same user_id, history intact)
+```
 
 ### 3.1 New User Registration
 <!-- Step-by-step flow -->
@@ -76,7 +90,7 @@ The user enters the details of their purchase at hand. The app generates the ver
 
 The details include the product name, price, category, vendor, justification, and a toggle to indicate if the purchase is important or not (i.e., major purchase like a laptop, a new phone, etc.). The app will use an emoji to present the item's product category as an extra UI element to help the user understand the category of the purchase.
 
-**Free tier:** 3 verdicts per week with a shorter rationale. **Premium tier:** unlimited verdicts with full rationale referencing user profile and values.
+**Free tier:** 3 verdicts per day (enforced server-side via `checkDailyVerdictLimit` middleware; returns HTTP 429 with `error: 'daily_limit_reached'`). Anonymous and registered free users share the same cap. **Premium tier:** unlimited verdicts with full rationale referencing user profile and values.
 
 ```
 [Dashboard] → [Purchase Details Entry] → [Verdict Generation] → [Verdict Result]
@@ -269,10 +283,16 @@ Desktop: persistent topbar with nav links. Mobile (≤768px): hamburger menu ove
 
 | Current State | Event | Next State | Implemented |
 |--------------|-------|------------|-------------|
+| Unauthenticated | First page visit | Anonymous User (auto `signInAnonymously`) | ✅ done |
 | Unauthenticated | Sign up / sign in with email + password | Free User | ✅ done |
 | Unauthenticated | Try to access protected route (`/`, `/swipe`, `/profile`) | Unauthenticated (redirect to `/auth`) | ✅ done |
+| Anonymous User | Submit verdict (up to 3/day) | Anonymous User | ✅ done |
+| Anonymous User | Hit daily verdict cap | Anonymous User + PaywallModal shown | ✅ done |
+| Anonymous User | Convert via PaywallModal sign-up form | Free User (same `user_id`, history preserved) | ✅ done |
 | Free User | Complete or edit onboarding/profile answers | Free User | ✅ done |
-| Free User | Submit purchase decision form (up to 3/week) | Free User | ❌ not yet (no cap enforced) |
+| Free User | Submit purchase decision form (up to 3/day) | Free User | ✅ done |
+| Free User | Hit daily verdict cap | Free User + PaywallModal shown | ✅ done |
+| Free User | Join premium waitlist via PaywallModal | Free User (waitlist row created) | ✅ done |
 | Free User | Mark verdict decision (`bought` / `hold` / `skip`) | Free User | ✅ done |
 | Free User | Add / edit / delete purchases | Free User | ✅ done |
 | Free User | Swipe for regret/satisfaction (including undo) | Free User | ✅ done |
@@ -293,12 +313,14 @@ API calls are mapped in `BACKEND_GUIDELINES.md` Section 2.3. Key patterns:
 - **Auth:** Supabase Auth (`signInWithPassword`, `signUp`, `signOut`)
 - **CRUD:** `supabase.from('<table>')` for reads/writes
 - **Protected writes:** `supabase.rpc('add_purchase')`, `supabase.rpc('add_user_value')`
-- **LLM:** Direct `fetch` to OpenAI Chat Completions + Embeddings
+- **LLM:** All LLM calls go through the authenticated API proxy (`POST /api/verdict`). The proxy applies `checkDailyVerdictLimit` middleware (returns 429 `daily_limit_reached` when cap hit) and `rateLimitLLM` before forwarding to OpenAI. Frontend never calls OpenAI directly.
+- **Daily limit:** `checkDailyVerdictLimit` middleware queries `verdicts` table; 429 body carries `{ error, verdicts_remaining, verdicts_used_today, daily_limit }`. Success response carries `verdicts_remaining` for client-side counter.
+- **Waitlist:** `POST /api/waitlist` — no auth required; accepts `{ email, verdicts_at_signup }`, writes to `waitlist` table.
 - **Email import:** Gmail REST API / Microsoft Graph API + GPT-5-nano receipt parsing
 
-**Not yet implemented:** educational content API, verdict rate limiting (free tier cap), premium tier billing/upgrade flow, Chrome Extension APIs, spending analytics endpoints.
+**Not yet implemented:** educational content API, premium tier billing/upgrade flow, Chrome Extension APIs, spending analytics endpoints, `verdicts_remaining` counter wired to Dashboard state, Stripe webhook for `paywall_conversion_completed`.
 
-**Recently implemented:** Share verdict (`shared_verdicts` table with `shareService.ts` — create, get, increment view count; `VerdictShareModal` for image generation and platform sharing; `/shared/:token` public landing page).
+**Recently implemented:** Daily verdict cap enforcement + PaywallModal + anonymous auth (`signInAnonymously`, `updateUser` conversion); Tier 1 PostHog telemetry (6 events); share verdict (`shared_verdicts` table, `VerdictShareModal`, `/shared/:token` public page); `waitlist` table + `/api/waitlist` endpoint.
 
 ---
 

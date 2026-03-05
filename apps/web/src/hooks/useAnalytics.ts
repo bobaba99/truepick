@@ -36,6 +36,7 @@ export const initializePostHog = (): void => {
     session_recording: {
       maskAllInputs: true,
       maskTextSelector: '[data-ph-mask]',
+      sampleRate: 1, // 100% at MVP — reduce to 0.2 at 10k+ DAU
     },
   })
 }
@@ -45,10 +46,10 @@ export const setAnalyticsUserId = (userId: string | null): void => {
   ReactGA.set({ user_id: userId ?? undefined })
 }
 
-export const identifyPostHogUser = (userId: string | null): void => {
+export const identifyPostHogUser = (userId: string | null, isAnonymous = false): void => {
   if (!isPostHogEnabled()) return
   if (userId) {
-    posthog.identify(userId)
+    posthog.identify(userId, { is_anonymous: isAnonymous })
   } else {
     posthog.reset()
   }
@@ -66,7 +67,10 @@ const trackEvent = (
   }
 }
 
-const bucketPrice = (price: number | null): string => {
+type InputMethod = 'manual' | 'chrome_extension' | 'url_paste'
+type UserTier = 'free' | 'premium'
+
+export const bucketPrice = (price: number | null): string => {
   if (price === null || price === undefined) return 'unknown'
   if (price < 25) return '0-25'
   if (price < 100) return '25-100'
@@ -146,6 +150,84 @@ const trackProfileUpdated = (hasBudget: boolean, quizSectionsFilled: number) =>
 
 const trackSettingsChanged = (settingName: string, newValue: string) =>
   trackEvent('settings_changed', { setting_name: settingName, new_value: newValue })
+
+// ---------------------------------------------------------------------------
+// Tier 1+: Paywall & Conversion Events
+// ---------------------------------------------------------------------------
+
+const trackVerdictRequested = (params: {
+  product_category: string
+  price_range: string
+  input_method: InputMethod
+  user_tier: UserTier
+  verdicts_remaining_today: number | null
+}) =>
+  trackEvent('verdict_requested', {
+    product_category: params.product_category,
+    price_range: params.price_range,
+    input_method: params.input_method,
+    user_tier: params.user_tier,
+    verdicts_remaining_today: params.verdicts_remaining_today ?? undefined,
+  })
+
+const trackVerdictDelivered = (params: {
+  verdict_outcome: string
+  confidence_score: number | null
+  response_latency_ms: number
+  verdict_id: string
+}) =>
+  trackEvent('verdict_delivered', {
+    verdict_outcome: params.verdict_outcome,
+    confidence_score: params.confidence_score ?? undefined,
+    response_latency_ms: Math.round(params.response_latency_ms),
+    verdict_id: params.verdict_id,
+  })
+
+const trackVerdictOverride = (params: {
+  verdict_id: string
+  original_verdict: string
+  user_action: 'bought_anyway' | 'skipped_anyway'
+  time_since_verdict_ms: number
+}) =>
+  trackEvent('verdict_override', {
+    verdict_id: params.verdict_id,
+    original_verdict: params.original_verdict,
+    user_action: params.user_action,
+    time_since_verdict_ms: Math.round(params.time_since_verdict_ms),
+  })
+
+const trackPaywallHit = (params: {
+  verdicts_used_today: number
+  session_verdicts_count: number
+  time_of_day: number
+  day_of_week: number
+}) =>
+  trackEvent('paywall_hit', {
+    verdicts_used_today: params.verdicts_used_today,
+    session_verdicts_count: params.session_verdicts_count,
+    time_of_day: params.time_of_day,
+    day_of_week: params.day_of_week,
+  })
+
+const trackPaywallConversionStarted = (params: {
+  trigger_context: string
+  verdicts_at_conversion: number | null
+}) =>
+  trackEvent('paywall_conversion_started', {
+    trigger_context: params.trigger_context,
+    verdicts_at_conversion: params.verdicts_at_conversion ?? undefined,
+  })
+
+const trackShareCardGenerated = (params: {
+  verdict_id: string
+  share_destination: string | null
+  theme_selected: string
+}) =>
+  trackEvent('share_card_generated', {
+    verdict_id: params.verdict_id,
+    share_destination: params.share_destination ?? undefined,
+    theme_selected: params.theme_selected,
+  })
 
 // ---------------------------------------------------------------------------
 // Tier 2: Friction & Latency Signals
@@ -254,6 +336,12 @@ const trackSharedVerdictCtaClicked = () => trackEvent('shared_verdict_cta_clicke
 const analytics = {
   // Tier 1
   trackSignUp,
+  trackVerdictRequested,
+  trackVerdictDelivered,
+  trackVerdictOverride,
+  trackPaywallHit,
+  trackPaywallConversionStarted,
+  trackShareCardGenerated,
   trackLogin,
   trackVerdictSubmitted,
   trackVerdictDecision,

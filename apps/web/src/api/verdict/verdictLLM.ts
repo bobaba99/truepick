@@ -92,6 +92,15 @@ const attemptLlmCall = async (
 
     if (!response.ok) {
       const errorBody = await response.text()
+      if (response.status === 429) {
+        let parsed: Record<string, unknown> = {}
+        try { parsed = JSON.parse(errorBody) as Record<string, unknown> } catch { /* ignore */ }
+        if (parsed.error === 'daily_limit_reached') {
+          const err = new Error('daily_limit_reached') as Error & { paywallData: typeof parsed }
+          err.paywallData = parsed
+          throw err
+        }
+      }
       return { data: null, error: `API error: ${response.status} - ${errorBody}` }
     }
 

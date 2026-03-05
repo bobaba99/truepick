@@ -73,6 +73,11 @@ export default function VerdictShareModal({
       if (cancelled) return
       if (result.token) {
         analytics.trackShareLinkCreated(Date.now() - shareLinkStartRef.current)
+        analytics.trackShareCardGenerated({
+          verdict_id: verdict.id,
+          share_destination: null,
+          theme_selected: background,
+        })
         setShareUrl(buildShareUrl(result.token))
       } else {
         showToast(result.error ?? 'Could not create share link')

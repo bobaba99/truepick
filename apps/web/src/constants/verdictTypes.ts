@@ -31,6 +31,7 @@ export type VerdictRow = {
   justification?: string | null
   predicted_outcome: VerdictOutcome | null
   reasoning?: Record<string, unknown> | null
+  confidence_score?: number | null
   hold_release_at: string | null
   user_proceeded?: boolean | null
   actual_outcome?: string | null

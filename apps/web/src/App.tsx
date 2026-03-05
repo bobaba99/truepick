@@ -235,8 +235,14 @@ function App() {
   }, [handleScroll])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) {
+        setSession(data.session)
+      } else {
+        // No session — sign in anonymously so guests get a real user_id
+        const { data: anonData } = await supabase.auth.signInAnonymously()
+        setSession(anonData.session)
+      }
       setSessionLoading(false)
     })
 
@@ -289,10 +295,13 @@ function App() {
 
     setLoading(true)
 
+    const isAnonymous = session?.user.is_anonymous ?? false
     const action =
       authMode === 'sign_in'
         ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({ email, password })
+        : isAnonymous
+          ? supabase.auth.updateUser({ email, password })  // converts anonymous → permanent
+          : supabase.auth.signUp({ email, password })       // fresh sign-up
 
     const { data, error } = await action
 
@@ -302,7 +311,8 @@ function App() {
       return
     }
 
-    if (authMode === 'sign_up' && !data.session) {
+    const resultSession = 'session' in data ? data.session : null
+    if (authMode === 'sign_up' && !resultSession) {
       setStatus({
         type: 'success',
         message:
@@ -311,6 +321,10 @@ function App() {
     } else {
       if (authMode === 'sign_up') {
         analytics.trackSignUp()
+        // Sync user record on account creation (skipped for anonymous users)
+        if (resultSession) {
+          void syncUserRecord(resultSession)
+        }
       } else {
         analytics.trackLogin()
       }
@@ -381,7 +395,7 @@ function App() {
                 <>
                   <div className="session-chip session-chip--desktop">
                     <span className="session-label">Signed in</span>
-                    <span className="session-email">{session.user.email}</span>
+                    <span className="session-email">{session.user.email ?? 'Guest'}</span>
                     <LiquidButton
                       className="ghost"
                       type="button"
@@ -394,7 +408,7 @@ function App() {
                   </div>
                   <div className="session-chip session-chip--mobile">
                     <span className="avatar-placeholder" aria-label="User profile">
-                      {session.user.email?.charAt(0).toUpperCase() ?? '?'}
+                      {session.user.email?.charAt(0).toUpperCase() ?? 'G'}
                     </span>
                     <LiquidButton
                       className="ghost"
