@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-For the fast deployment and the least hassle for the developers given prior experiences. The project is a TypeScript-first npm workspaces monorepo (`apps/web`, `apps/api`, `apps/mobile`, `packages/shared`) targeting web, mobile, and a lightweight API layer, all backed by Supabase.
+For the fast deployment and the least hassle for the developers given prior experiences. The project is a TypeScript-first npm workspaces monorepo (`apps/web`, `apps/api`, `packages/shared`) targeting web and a lightweight API layer, all backed by Supabase.
 
 ---
 
@@ -21,13 +21,6 @@ For the fast deployment and the least hassle for the developers given prior expe
 | State Management | React built-ins (`useState`, `useEffect`, `useMemo`) | — | No external state library; Supabase client is the remote source of truth |
 | Supabase Client | @supabase/supabase-js | ^2.45.0 | Auth, DB reads/writes, and RPC calls directly from the browser |
 | Testing | — | — | Not yet configured |
-
-### Mobile (`apps/mobile`)
-
-| Layer | Technology | Version | Rationale |
-|-------|-----------|---------|-----------|
-| Framework | React Native (Expo) | 0.81.5 / ~54.0.32 | Cross-platform mobile with managed workflow |
-| Language | TypeScript | ~5.9.2 | Consistent with the rest of the monorepo |
 
 ---
 
@@ -120,9 +113,6 @@ Most backend logic runs through Supabase directly from the web client:
 │    ├─ Supabase JS Client ──► Supabase Auth / DB / RPC   │
 │    ├─ OpenAI fetch ────────► Chat Completions + Embed.  │
 │    └─ Gmail API fetch ─────► OAuth + Receipt Import     │
-│                                                         │
-│  apps/mobile (Expo / React Native)                      │
-│    └─ (scaffold)                                        │
 │                                                         │
 │  apps/api (Express)                                     │
 │    └─ /health (scaffold)                                │
