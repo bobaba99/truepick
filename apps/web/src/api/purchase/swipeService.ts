@@ -43,7 +43,7 @@ export async function getUnratedPurchases(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as SwipeScheduleQueryRow[]
+  const rows = (data ?? []) as unknown as SwipeScheduleQueryRow[]
 
   // Get verdict decisions for purchases that came from verdicts
   const verdictIds = rows

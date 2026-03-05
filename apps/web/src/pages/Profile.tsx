@@ -428,7 +428,7 @@ export default function Profile({ session }: ProfileProps) {
     setProfileModalOpen(true)
   }
 
-  const openPreferencesModal = () => {
+  const _openPreferencesModal = () => {
     setProfileDraftPreferences(profilePreferences)
     setPreferencesModalOpen(true)
   }

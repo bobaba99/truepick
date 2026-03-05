@@ -158,7 +158,7 @@ export default function AdminResources({ session }: AdminResourcesProps) {
       setBodyMarkdown(quill.root.innerHTML)
     })
 
-    quill.getModule('toolbar').addHandler('image', () => {
+    ;(quill.getModule('toolbar') as { addHandler: (type: string, handler: () => void) => void }).addHandler('image', () => {
       const fileInput = document.createElement('input')
       fileInput.type = 'file'
       fileInput.accept = 'image/png,image/jpeg,image/gif'
