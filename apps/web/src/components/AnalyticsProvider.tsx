@@ -52,8 +52,9 @@ export default function AnalyticsProvider({
   // Set user ID when session changes
   useEffect(() => {
     const userId = session?.user?.id ?? null
+    const isAnonymous = session?.user?.is_anonymous ?? false
     setAnalyticsUserId(userId)
-    identifyPostHogUser(userId)
+    identifyPostHogUser(userId, isAnonymous)
   }, [session])
 
   // Track page views on route change
