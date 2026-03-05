@@ -36,8 +36,10 @@
   "dependencies": {
     "@azure/identity": "^4.13.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@posthog/react": "^1.8.2",
     "isomorphic-fetch": "^3.0.0",
     "openai": "^6.21.0",
+    "posthog-js": "^1.358.1",
     "readline-sync": "^1.4.10"
   }
 }

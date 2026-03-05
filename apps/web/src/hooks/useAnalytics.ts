@@ -11,14 +11,33 @@
  */
 
 import ReactGA from 'react-ga4'
+import posthog from 'posthog-js'
 
 const GA4_ID = import.meta.env.VITE_GA4_MEASUREMENT_ID ?? ''
+const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY ?? ''
+const POSTHOG_HOST = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
 
 export const isAnalyticsEnabled = (): boolean => GA4_ID.length > 0
+export const isPostHogEnabled = (): boolean => POSTHOG_KEY.length > 0
 
 export const initializeGA4 = (): void => {
   if (!isAnalyticsEnabled()) return
   ReactGA.initialize(GA4_ID)
+}
+
+export const initializePostHog = (): void => {
+  if (!isPostHogEnabled()) return
+  posthog.init(POSTHOG_KEY, {
+    api_host: POSTHOG_HOST,
+    person_profiles: 'identified_only',
+    capture_pageview: false,
+    capture_pageleave: true,
+    autocapture: true,
+    session_recording: {
+      maskAllInputs: true,
+      maskTextSelector: '[data-ph-mask]',
+    },
+  })
 }
 
 export const setAnalyticsUserId = (userId: string | null): void => {
@@ -26,12 +45,25 @@ export const setAnalyticsUserId = (userId: string | null): void => {
   ReactGA.set({ user_id: userId ?? undefined })
 }
 
+export const identifyPostHogUser = (userId: string | null): void => {
+  if (!isPostHogEnabled()) return
+  if (userId) {
+    posthog.identify(userId)
+  } else {
+    posthog.reset()
+  }
+}
+
 const trackEvent = (
   eventName: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): void => {
-  if (!isAnalyticsEnabled()) return
-  ReactGA.event(eventName, params)
+  if (isAnalyticsEnabled()) {
+    ReactGA.event(eventName, params)
+  }
+  if (isPostHogEnabled()) {
+    posthog.capture(eventName, params)
+  }
 }
 
 const bucketPrice = (price: number | null): string => {

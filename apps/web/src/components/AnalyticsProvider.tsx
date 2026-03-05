@@ -13,11 +13,15 @@ import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import ReactGA from 'react-ga4'
+import posthog from 'posthog-js'
 import {
   analytics,
   initializeGA4,
+  initializePostHog,
   isAnalyticsEnabled,
+  isPostHogEnabled,
   setAnalyticsUserId,
+  identifyPostHogUser,
 } from '../hooks/useAnalytics'
 
 type AnalyticsProviderProps = {
@@ -41,18 +45,28 @@ export default function AnalyticsProvider({
   useEffect(() => {
     if (initializedRef.current) return
     initializeGA4()
+    initializePostHog()
     initializedRef.current = true
   }, [])
 
   // Set user ID when session changes
   useEffect(() => {
-    setAnalyticsUserId(session?.user?.id ?? null)
+    const userId = session?.user?.id ?? null
+    setAnalyticsUserId(userId)
+    identifyPostHogUser(userId)
   }, [session])
 
   // Track page views on route change
   useEffect(() => {
-    if (!isAnalyticsEnabled()) return
-    ReactGA.send({ hitType: 'pageview', page: location.pathname, title: document.title })
+    if (isAnalyticsEnabled()) {
+      ReactGA.send({ hitType: 'pageview', page: location.pathname, title: document.title })
+    }
+    if (isPostHogEnabled()) {
+      posthog.capture('$pageview', {
+        $current_url: window.location.href,
+        $pathname: location.pathname,
+      })
+    }
   }, [location.pathname])
 
   // Measure session load duration (time until auth resolves)
