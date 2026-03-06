@@ -63,6 +63,7 @@
 - [x] Wire `verdicts_remaining` from API success response into Dashboard state and show counter UI — **Branch:** `feat/verdicts-remaining-counter`
 - [x] Soft-delete verdicts — `deleted_at` column + migration; `deleteVerdict` now soft-deletes; daily limit count and history queries exclude soft-deleted rows — **Branch:** `feat/verdicts-remaining-counter`
 - [x] Regeneration bypasses daily limit — `existingVerdictId` threaded from `handleVerdictRegenerate` through `evaluatePurchase` → `evaluateWithLlm` → request body; backend verifies ownership before skipping count — **Branch:** `feat/verdicts-remaining-counter`
+- [x] Fluid typography system — replaced 40+ fixed `rem`/`px` font-size values with `clamp()`-based fluid sizes scaling 375px→1440px; removed redundant `@media(max-width:600px)` font-size overrides; added fluid rem anchor on `:root`; SI card classes left untouched — **Branch:** `ui/fluid-typography`
 
 ---
 
@@ -123,6 +124,7 @@ _(none currently)_
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-05 | Fluid typography — clamp()-based font sizes across all major text elements | Text felt too small on desktop and cramped on mobile; fluid scaling eliminates single-breakpoint jumps | Smooth text scaling 375px→1440px with no manual mobile overrides needed |
 | 2026-03-05 | Soft-delete verdicts, regeneration limit bypass, verdicts remaining counter, Resend waitlist email | Prevent daily limit bypass via deletion; exempt regeneration; surface remaining count to user | Daily limit integrity enforced end-to-end; UX counter visible after first verdict |
 | 2026-03-04 | Daily limit enforcement, PaywallModal, anonymous auth, Tier 1 PostHog telemetry | Freemium launch readiness — enforce 3/day cap, capture conversion funnel | Verdict gate live; 6 new PostHog events; guest users tracked |
 | 2026-02-25 | Integrated freemium tier model into APP_FLOW.md, README.md, progress.md | Align docs with `freemium_features.md` product strategy | State transitions, verdict flow, and roadmap now reflect free/premium split |
