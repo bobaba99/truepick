@@ -674,8 +674,6 @@ export default function Swipe({ session }: SwipeProps) {
 
   return (
     <section className="route-content">
-      <h1>Swipe queue</h1>
-      {renderFilter()}
       {totalDue > 0 && (
         <div className="swipe-progress-container">
           <div
@@ -821,6 +819,8 @@ export default function Swipe({ session }: SwipeProps) {
         </LiquidButton>
       </div>
 
+      <h1>Swipe queue</h1>
+      {renderFilter()}
       {renderUpcomingSection()}
 
     </section>
