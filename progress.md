@@ -64,6 +64,7 @@
 - [x] Soft-delete verdicts — `deleted_at` column + migration; `deleteVerdict` now soft-deletes; daily limit count and history queries exclude soft-deleted rows — **Branch:** `feat/verdicts-remaining-counter`
 - [x] Regeneration bypasses daily limit — `existingVerdictId` threaded from `handleVerdictRegenerate` through `evaluatePurchase` → `evaluateWithLlm` → request body; backend verifies ownership before skipping count — **Branch:** `feat/verdicts-remaining-counter`
 - [x] Fluid typography system — replaced 40+ fixed `rem`/`px` font-size values with `clamp()`-based fluid sizes scaling 375px→1440px; removed redundant `@media(max-width:600px)` font-size overrides; added fluid rem anchor on `:root`; SI card classes left untouched — **Branch:** `ui/fluid-typography`
+- [x] Mobile layout polish — Profile Verdicts button rows split into utility/decision/danger rows; Purchases and Resources cards use meta-chip pills instead of plain text; Swipe schedule queue moved below interaction; filter moved below heading with native `<select>` on mobile — **Branch:** `fix/mobile-layout-polish`
 
 ---
 
@@ -73,10 +74,6 @@
 - [ ] Implement user data deletion and data export (GDPR Art. 17, 20) — **Branch:** `feat/account-data-request-deletion`
 - [ ] Implement SEO optimization for resources page (OG tags, metadata) — **Branch:** `feat/resources-page-seo-optimization`
 - [ ] Refine prompt engineering `feat/refine-prompt`
-- [ ] Mobile view: Resources
-- [ ] Mobile view: Profiles/Verdicts
-- [ ] Mobile view: Profiles/Purchases
-- [ ] Mobile view: Swipes, add drop down for the schedule
 
 
 ---
@@ -124,6 +121,7 @@ _(none currently)_
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-05 | Mobile layout polish — Profile, Purchases, Resources, Swipe | Cards showed raw label:value text; buttons overflowed on mobile; swipe queue and filter were above the interaction | Meta-chip cards, clean button rows, and swipe UI reordered for natural mobile scroll flow |
 | 2026-03-05 | Fluid typography — clamp()-based font sizes across all major text elements | Text felt too small on desktop and cramped on mobile; fluid scaling eliminates single-breakpoint jumps | Smooth text scaling 375px→1440px with no manual mobile overrides needed |
 | 2026-03-05 | Soft-delete verdicts, regeneration limit bypass, verdicts remaining counter, Resend waitlist email | Prevent daily limit bypass via deletion; exempt regeneration; surface remaining count to user | Daily limit integrity enforced end-to-end; UX counter visible after first verdict |
 | 2026-03-04 | Daily limit enforcement, PaywallModal, anonymous auth, Tier 1 PostHog telemetry | Freemium launch readiness — enforce 3/day cap, capture conversion funnel | Verdict gate live; 6 new PostHog events; guest users tracked |
