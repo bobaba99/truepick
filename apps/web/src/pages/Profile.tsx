@@ -935,7 +935,7 @@ export default function Profile({ session }: ProfileProps) {
                   </div>
                 </div>
                 <div className="verdict-actions">
-                  <div className="decision-buttons">
+                  <div className="verdict-actions-links">
                     <LiquidButton
                       type="button"
                       className="link"
@@ -951,6 +951,8 @@ export default function Profile({ session }: ProfileProps) {
                     >
                       {isRegenerating ? 'Regenerating...' : 'Regenerate'}
                     </LiquidButton>
+                  </div>
+                  <div className="decision-buttons">
                     <LiquidButton
                       type="button"
                       className={`decision-btn bought ${verdict.user_decision === 'bought' ? 'active' : ''}`}
@@ -1051,16 +1053,11 @@ export default function Profile({ session }: ProfileProps) {
                     <span className="stat-label">Item </span>
                     <span className="stat-value">{purchase.title}</span>
                   </div>
-                  <div className="verdict-meta">
-                    <span>
-                      Price: {formatCurrency(Number(purchase.price))}
-                    </span>
-                    <span>Vendor: {purchase.vendor ?? '—'}</span>
-                    <span>Category: {purchase.category ?? '—'}</span>
-                    <span>Source: {purchase.source ?? '—'}</span>
-                    <span>
-                      Date: {formatDate(purchase.purchase_date)}
-                    </span>
+                  <div className="meta-chips">
+                    <span className="meta-chip meta-chip--price">{formatCurrency(Number(purchase.price))}</span>
+                    {purchase.category && <span className="meta-chip">{purchase.category}</span>}
+                    <span className="meta-chip">{formatDate(purchase.purchase_date)}</span>
+                    {purchase.vendor && <span className="meta-chip meta-chip--secondary">{purchase.vendor}</span>}
                   </div>
                 </div>
                 <div className="verdict-actions">

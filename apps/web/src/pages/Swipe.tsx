@@ -282,25 +282,38 @@ export default function Swipe({ session }: SwipeProps) {
     setViewMode(mode)
   }
 
+  const FILTER_OPTIONS: { value: SwipeFilterMode; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'immediate', label: 'Immediate' },
+    { value: 'day3', label: '3 days' },
+    { value: 'week3', label: '3 weeks' },
+    { value: 'month3', label: '3 months' },
+  ]
+
   const renderFilter = () => (
-    <div className="swipe-filter">
-      {[
-        { value: 'all', label: 'All' },
-        { value: 'immediate', label: 'Immediate' },
-        { value: 'day3', label: '3 days' },
-        { value: 'week3', label: '3 weeks' },
-        { value: 'month3', label: '3 months' },
-      ].map((option) => (
-        <LiquidButton
-          key={option.value}
-          type="button"
-          className={`filter-chip ${viewMode === option.value ? 'active' : ''}`}
-          onClick={() => handleFilterChange(option.value as SwipeFilterMode)}
-        >
-          {option.label}
-        </LiquidButton>
-      ))}
-    </div>
+    <>
+      <div className="swipe-filter swipe-filter--pills">
+        {FILTER_OPTIONS.map((option) => (
+          <LiquidButton
+            key={option.value}
+            type="button"
+            className={`filter-chip ${viewMode === option.value ? 'active' : ''}`}
+            onClick={() => handleFilterChange(option.value)}
+          >
+            {option.label}
+          </LiquidButton>
+        ))}
+      </div>
+      <select
+        className="swipe-filter--select"
+        value={viewMode}
+        onChange={(e) => handleFilterChange(e.target.value as SwipeFilterMode)}
+      >
+        {FILTER_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </>
   )
 
   const renderQueueCard = (item: SwipeQueueItem) => {
@@ -599,9 +612,9 @@ export default function Swipe({ session }: SwipeProps) {
   if (purchases.length === 0) {
     return (
       <section className="route-content">
-        {renderFilter()}
         {renderUpcomingSection()}
         <h1>Swipe queue</h1>
+        {renderFilter()}
         <p>Rate your past purchases to build your regret patterns.</p>
         <div className="empty-card">
           <span>No purchases to rate. Add some in your Profile first.</span>
@@ -613,9 +626,9 @@ export default function Swipe({ session }: SwipeProps) {
   if (!currentPurchase) {
     return (
       <section className="route-content">
-        {renderFilter()}
         {renderUpcomingSection()}
         <h1>Swipe queue</h1>
+        {renderFilter()}
         <p>
           {duePurchases.length === 0
             ? 'No swipes due yet.'
@@ -660,10 +673,10 @@ export default function Swipe({ session }: SwipeProps) {
 
   return (
     <section className="route-content">
-      {renderFilter()}
       {renderUpcomingSection()}
 
       <h1>Swipe queue</h1>
+      {renderFilter()}
       {totalDue > 0 && (
         <div className="swipe-progress-container">
           <div

@@ -74,24 +74,20 @@ export default function Resources() {
             const publishedDate = resource.published_at ?? resource.created_at
 
             return (
-              <GlassCard key={resource.id} className="verdict-card">
+              <GlassCard key={resource.id} className="verdict-card resource-card">
                 <div className="verdict-card-content">
-                  <div>
-                    <span className="stat-value">{resource.title}</span>
-                  </div>
-                  <div className="verdict-meta">
-                    <span>{resource.summary}</span>
+                  {resource.cover_image_url && (
+                    <img className="resource-cover" src={resource.cover_image_url} alt="" />
+                  )}
+                  <span className="stat-value resource-title">{resource.title}</span>
+                  <p className="resource-summary">{resource.summary}</p>
+                  <div className="meta-chips">
                     {resource.reading_time_minutes && (
-                      <span>Reading time: {resource.reading_time_minutes} min</span>
+                      <span className="meta-chip">{resource.reading_time_minutes} min read</span>
                     )}
-                    {publishedDate && (
-                      <span>
-                        Published: {formatDate(publishedDate)}
-                      </span>
-                    )}
-                    {Array.isArray(resource.tags) && resource.tags.length > 0 && (
-                      <span>Tags: {resource.tags.join(', ')}</span>
-                    )}
+                    {Array.isArray(resource.tags) && resource.tags.map((tag) => (
+                      <span key={tag} className="meta-chip">{tag}</span>
+                    ))}
                   </div>
                 </div>
                 <div className="verdict-actions">
