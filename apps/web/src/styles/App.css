@@ -79,7 +79,7 @@
 
 .brand {
   font-family: 'DM Serif Display', serif;
-  font-size: 2.5rem;
+  font-size: clamp(1.5rem, 1.1rem + 1.7vw, 2.5rem);
   letter-spacing: 0.04em;
   color: var(--ink-900);
 }
@@ -159,7 +159,7 @@
 }
 
 .hero p {
-  font-size: 1.05rem;
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.05rem);
   line-height: 1.7;
   color: var(--ink-600);
   margin: 0;
@@ -206,7 +206,7 @@
 
 .card-header h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.6rem;
+  font-size: clamp(1.2rem, 0.9rem + 1.2vw, 1.6rem);
   color: var(--ink-900);
 }
 
@@ -360,6 +360,7 @@
   border: none;
   text-decoration: none;
   color: var(--ink-600);
+  font-size: clamp(0.85rem, 0.75rem + 0.4vw, 0.95rem);
   font-weight: 600;
   white-space: nowrap;
   background: transparent;
@@ -391,7 +392,7 @@
 
 .route-content h1 {
   margin-top: 0;
-  font-size: 2rem;
+  font-size: clamp(1.4rem, 1rem + 1.7vw, 2rem);
   color: var(--ink-900);
 }
 
@@ -462,6 +463,7 @@
 
 .section-header h2 {
   margin: 0;
+  font-size: clamp(1.2rem, 0.9rem + 1.2vw, 1.6rem);
   color: var(--ink-900);
   white-space: nowrap;
 }
@@ -614,7 +616,7 @@
 
 .quiz-section h3 {
   margin: 0 0 0.35rem;
-  font-size: 1.05rem;
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.05rem);
   color: var(--ink-900);
 }
 
@@ -1575,7 +1577,7 @@
   backdrop-filter: blur(12px);
   box-shadow: var(--glass-shadow);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: clamp(0.75rem, 0.7rem + 0.2vw, 0.85rem);
   color: var(--ink-700);
   text-align: left;
 }
@@ -1782,7 +1784,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 0.75rem + 0.2vw, 0.9rem);
   font-weight: 500;
   color: var(--ink-700);
 }
@@ -2151,7 +2153,7 @@
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: clamp(1.15rem, 0.9rem + 1vw, 1.4rem);
   color: var(--ink-900);
   line-height: 1.3;
 }
@@ -2300,13 +2302,13 @@
 
 .detail-section h3 {
   margin: 0 0 0.75rem;
-  font-size: 1rem;
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.1rem);
   color: var(--ink-800);
 }
 
 .detail-text {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: clamp(0.875rem, 0.8rem + 0.3vw, 0.95rem);
   color: var(--ink-600);
   line-height: 1.6;
 }
@@ -2907,7 +2909,7 @@
 
 .article-body h2 {
   margin: 2rem 0 1rem;
-  font-size: 1.5rem;
+  font-size: clamp(1.15rem, 0.9rem + 1.2vw, 1.5rem);
   color: var(--ink-900);
 }
 
@@ -3048,10 +3050,6 @@
     padding: 0;
   }
 
-  .article-header h1 {
-    font-size: 1.5rem;
-  }
-
   .article-meta {
     flex-direction: column;
     gap: 0.5rem;
@@ -3078,7 +3076,7 @@
 /* Email Import Modal Styles */
 .import-description {
   color: var(--ink-700);
-  font-size: 0.95rem;
+  font-size: clamp(0.875rem, 0.8rem + 0.3vw, 0.95rem);
   margin-bottom: 1.5rem;
 }
 
@@ -3177,13 +3175,13 @@
 
 .content-panel h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: clamp(1.15rem, 0.9rem + 1.2vw, 1.5rem);
   color: var(--ink-800);
 }
 
 .content-panel h3 {
   margin: 1.5rem 0 0.5rem;
-  font-size: 1.1rem;
+  font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.1rem);
   color: var(--ink-700);
 }
 
@@ -3597,10 +3595,6 @@
     border-radius: 16px;
   }
 
-  .brand {
-    font-size: 1.8rem;
-  }
-
   .form-row {
     grid-template-columns: 1fr 1fr;
   }
@@ -3651,7 +3645,6 @@
 
   .decision-form label {
     gap: 0.25rem;
-    font-size: 0.8rem;
   }
 
   .decision-form input,
@@ -3690,7 +3683,6 @@
   .reflection-bar-summary {
     padding: 0.6rem 0.75rem;
     gap: 0.5rem;
-    font-size: 0.8rem;
   }
 
   .reflection-bar-label {
@@ -3878,10 +3870,6 @@
     grid-template-columns: 1fr;
   }
 
-  .brand {
-    font-size: 1.5rem;
-  }
-
   .topbar {
     gap: 0.5rem;
   }
@@ -3929,7 +3917,7 @@
 }
 
 .stat-strip-value {
-  font-size: 1.4rem;
+  font-size: clamp(1.1rem, 0.9rem + 0.8vw, 1.4rem);
   font-weight: 700;
   color: var(--ink-900);
 }
@@ -4012,7 +4000,7 @@
   border: none;
   background: transparent;
   color: var(--ink-600);
-  font-size: 0.95rem;
+  font-size: clamp(0.8rem, 0.7rem + 0.4vw, 0.95rem);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -4161,17 +4149,12 @@
     font-size: 0.85rem;
   }
 
-  .stat-strip-value {
-    font-size: 1.1rem;
-  }
-
   .profile-tabs {
     gap: 0.25rem;
   }
 
   .profile-tab {
     padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
   }
 
   .profile-summary-row {
@@ -4346,7 +4329,7 @@
   height: 48px;
   border-radius: 14px;
   font-family: 'Outfit', 'Figtree', sans-serif;
-  font-size: 14px;
+  font-size: clamp(0.75rem, 0.7rem + 0.2vw, 0.875rem);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -4614,12 +4597,12 @@
 .shared-verdict-card.outcome-buy .shared-outcome-badge { background: rgba(34, 197, 94, 0.15); color: #15803d; border: 2px solid rgba(34, 197, 94, 0.4); }
 .shared-verdict-card.outcome-hold .shared-outcome-badge { background: rgba(251, 191, 36, 0.15); color: #854d0e; border: 2px solid rgba(251, 191, 36, 0.4); }
 .shared-verdict-card.outcome-skip .shared-outcome-badge { background: rgba(239, 68, 68, 0.15); color: #b91c1c; border: 2px solid rgba(239, 68, 68, 0.4); }
-.shared-verdict-card h2 { font-size: 1.6rem; margin: 0 0 1rem; color: var(--ink-900); }
-.shared-verdict-price { font-size: 1.3rem; font-weight: 600; color: var(--ink-700); margin-bottom: 0.5rem; }
+.shared-verdict-card h2 { font-size: clamp(1.2rem, 0.9rem + 1.2vw, 1.6rem); margin: 0 0 1rem; color: var(--ink-900); }
+.shared-verdict-price { font-size: clamp(1rem, 0.8rem + 0.8vw, 1.3rem); font-weight: 600; color: var(--ink-700); margin-bottom: 0.5rem; }
 .shared-verdict-vendor { font-size: 1rem; color: var(--ink-500); margin-bottom: 1.5rem; }
-.shared-verdict-rationale { font-size: 1.05rem; line-height: 1.6; color: var(--ink-600); font-style: italic; max-width: 500px; margin: 0 auto; }
+.shared-verdict-rationale { font-size: clamp(0.95rem, 0.85rem + 0.4vw, 1.05rem); line-height: 1.6; color: var(--ink-600); font-style: italic; max-width: 500px; margin: 0 auto; }
 .shared-verdict-cta { text-align: center; padding: 2rem; background: rgba(59, 130, 246, 0.05); border-radius: 20px; border: 1px solid rgba(59, 130, 246, 0.15); }
-.shared-verdict-cta h2 { font-size: 1.5rem; margin: 0 0 0.75rem; color: var(--ink-900); }
+.shared-verdict-cta h2 { font-size: clamp(1.15rem, 0.9rem + 1.2vw, 1.5rem); margin: 0 0 0.75rem; color: var(--ink-900); }
 .shared-verdict-cta p { font-size: 1rem; color: var(--ink-600); margin: 0 0 1.5rem; }
 .shared-verdict-footer { text-align: center; font-size: 0.9rem; color: var(--ink-500); }
 
@@ -4631,7 +4614,7 @@
   .share-platform-btn { width: 42px; height: 42px; border-radius: 12px; }
   .share-platform-btn svg { width: 18px; height: 18px; }
   .share-modal-actions { gap: 6px; }
-  .share-modal-btn { height: 42px; font-size: 13px; }
+  .share-modal-btn { height: 42px; }
   .share-bg-selector { gap: 8px; }
   .share-bg-swatch { width: 40px; height: 40px; }
   .shared-verdict-page { padding: 2rem 1rem; }

@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Space+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap');
 
 :root {
+  font-size: clamp(15px, 0.9375rem + 0.2vw, 17px);
   /* font-family: 'Space Grotesk', 'IBM Plex Sans', sans-serif; */
   font-family: 'Outfit', 'Figtree', sans-serif;
   line-height: 1.6;
