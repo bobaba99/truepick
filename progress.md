@@ -78,12 +78,6 @@
 
 ---
 
-## Blocked
-
-_(none currently)_
-
----
-
 ## Upcoming
 
 ### Free Tier (Phase 1 — current)
