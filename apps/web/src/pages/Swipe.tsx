@@ -612,13 +612,13 @@ export default function Swipe({ session }: SwipeProps) {
   if (purchases.length === 0) {
     return (
       <section className="route-content">
-        {renderUpcomingSection()}
         <h1>Swipe queue</h1>
         {renderFilter()}
         <p>Rate your past purchases to build your regret patterns.</p>
         <div className="empty-card">
           <span>No purchases to rate. Add some in your Profile first.</span>
         </div>
+        {renderUpcomingSection()}
       </section>
     )
   }
@@ -626,7 +626,6 @@ export default function Swipe({ session }: SwipeProps) {
   if (!currentPurchase) {
     return (
       <section className="route-content">
-        {renderUpcomingSection()}
         <h1>Swipe queue</h1>
         {renderFilter()}
         <p>
@@ -656,7 +655,7 @@ export default function Swipe({ session }: SwipeProps) {
           <span className="complete-icon">✓</span>
           <p>
             {upcomingPurchases.length > 0
-              ? 'No swipes due yet. Upcoming schedules are listed above.'
+              ? 'No swipes due yet. Upcoming schedules are listed below.'
               : 'All caught up! Add more purchases in your Profile to continue.'}
           </p>
           <LiquidButton
@@ -667,14 +666,14 @@ export default function Swipe({ session }: SwipeProps) {
             Refresh
           </LiquidButton>
         </div>
+
+        {renderUpcomingSection()}
       </section>
     )
   }
 
   return (
     <section className="route-content">
-      {renderUpcomingSection()}
-
       <h1>Swipe queue</h1>
       {renderFilter()}
       {totalDue > 0 && (
@@ -821,6 +820,8 @@ export default function Swipe({ session }: SwipeProps) {
           <span className="swipe-label">Not sure</span>
         </LiquidButton>
       </div>
+
+      {renderUpcomingSection()}
 
     </section>
   )
