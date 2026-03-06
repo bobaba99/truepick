@@ -337,6 +337,9 @@ export const evaluateWithLlm = async (
 
     return processLlmResponse(llmResponse, input, context)
   } catch (error) {
+    if (error instanceof Error && error.message === 'daily_limit_reached') {
+      throw error
+    }
     const errorMessage = error instanceof Error ? error.message : String(error)
     logger.error('LLM evaluation failed, using fallback', { error: errorMessage })
     const fallback = evaluatePurchaseFallback(input, buildFallbackOverrides(context))

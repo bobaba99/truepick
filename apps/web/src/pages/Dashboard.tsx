@@ -326,7 +326,25 @@ export default function Dashboard({ session }: DashboardProps) {
         setSelectedVerdict(data)
       }
       await loadStats()
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === 'daily_limit_reached' &&
+        'paywallData' in error
+      ) {
+        const paywallData = (error as Error & { paywallData: Record<string, unknown> }).paywallData
+        const usedToday = (paywallData.verdicts_used_today as number | undefined) ?? 3
+        setVerdictsUsedToday(usedToday)
+        setVerdictsRemainingToday(0)
+        analytics.trackPaywallHit({
+          verdicts_used_today: usedToday,
+          session_verdicts_count: sessionVerdictsCountRef.current,
+          time_of_day: new Date().getUTCHours(),
+          day_of_week: new Date().getUTCDay(),
+        })
+        setPaywallOpen(true)
+        return
+      }
       setStatus('Failed to regenerate verdict.')
     } finally {
       setVerdictRegeneratingId((currentVerdictId) =>
