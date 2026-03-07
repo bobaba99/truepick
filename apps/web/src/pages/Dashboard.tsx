@@ -38,10 +38,31 @@ const JUSTIFICATION_PLACEHOLDERS = [
   'Is this replacing something essential or adding something new?',
 ]
 
+function getNextUtcMidnight(from: number): Date {
+  const next = new Date(from)
+  next.setUTCHours(24, 0, 0, 0)
+  return next
+}
+
 function countWords(value: string): number {
   const trimmed = value.trim()
   if (!trimmed) return 0
   return trimmed.split(/\s+/).length
+}
+
+function formatCountdown(msRemaining: number): string {
+  const totalSeconds = Math.max(0, Math.floor(msRemaining / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  }
+  return `${seconds}s`
 }
 
 export default function Dashboard({ session }: DashboardProps) {
@@ -84,10 +105,19 @@ export default function Dashboard({ session }: DashboardProps) {
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [verdictsUsedToday, setVerdictsUsedToday] = useState(0)
   const [verdictsRemainingToday, setVerdictsRemainingToday] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const generationLockMessage =
     'Another verdict is currently being generated or regenerated. Please wait for it to finish.'
   const justificationWordCount = countWords(justification)
   const rotatingJustificationQuestion = JUSTIFICATION_PLACEHOLDERS[justificationPlaceholderIndex]
+  const nextVerdictRefreshAt = getNextUtcMidnight(nowMs)
+  const verdictRefreshCountdown = formatCountdown(nextVerdictRefreshAt.getTime() - nowMs)
+  const verdictRefreshLabel = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(nextVerdictRefreshAt)
   const justificationDetail =
     justificationWordCount === 0
       ? rotatingJustificationQuestion
@@ -127,6 +157,14 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return () => window.clearTimeout(timeoutId)
   }, [loadStats, loadRecentVerdicts])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     if (justification.trim().length > 0) {
@@ -654,11 +692,16 @@ export default function Dashboard({ session }: DashboardProps) {
           <div className="decision-section-header">
             <h2>New evaluation</h2>
             {verdictsRemainingToday !== null && (
-              <span className={`verdicts-remaining-pill${verdictsRemainingToday === 0 ? ' exhausted' : ''}`}>
-                {verdictsRemainingToday === 0
-                  ? 'Daily limit reached'
-                  : `${verdictsRemainingToday} free verdict${verdictsRemainingToday === 1 ? '' : 's'} remaining today`}
-              </span>
+              <div className="verdicts-remaining-meta">
+                <span className={`verdicts-remaining-pill${verdictsRemainingToday === 0 ? ' exhausted' : ''}`}>
+                  {verdictsRemainingToday === 0
+                    ? 'Daily limit reached'
+                    : `${verdictsRemainingToday} free verdict${verdictsRemainingToday === 1 ? '' : 's'} remaining today`}
+                </span>
+                <span className="verdicts-refresh-text">
+                  Refreshes in {verdictRefreshCountdown} • {verdictRefreshLabel}
+                </span>
+              </div>
             )}
           </div>
           <form className="decision-form" onSubmit={(e) => void handleEvaluate(e)}>
@@ -731,11 +774,19 @@ export default function Dashboard({ session }: DashboardProps) {
                 ))}
               </div>
               <GlassCard className="textarea-wrapper">
+                {justificationWordCount === 0 && (
+                  <span
+                    className={`textarea-ghost-prompt${isJustificationGuidanceVisible ? '' : ' is-fading'}`}
+                    aria-hidden="true"
+                  >
+                    {rotatingJustificationQuestion}
+                  </span>
+                )}
                 <textarea
                   value={justification}
                   onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setJustification(e.target.value)}
                   onFocus={() => trackFieldFocus('justification')}
-                  placeholder={JUSTIFICATION_PLACEHOLDERS[justificationPlaceholderIndex]}
+                  placeholder=""
                   rows={3}
                 />
               </GlassCard>
