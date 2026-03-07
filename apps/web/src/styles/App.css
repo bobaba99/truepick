@@ -1561,7 +1561,7 @@
   gap: 1rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -3694,23 +3694,8 @@
 
 }
 
-/* --- Phone (≤ 600px) --- */
-@media (max-width: 600px) {
-  .page {
-    padding: 1.5rem 0.5rem 2rem;
-    gap: 2rem;
-  }
-
-  .route-surface {
-    --surface-padding: 1.5rem;
-    border-radius: 16px;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  /* Show reflection bar, hide desktop-only elements */
+/* --- Portrait tablets + phones (≤ 1024px) use the stacked dashboard flow --- */
+@media (max-width: 1024px) and (orientation: portrait) {
   .reflection-bar {
     display: block;
     margin-bottom: 1rem;
@@ -3734,13 +3719,14 @@
   .verdicts-remaining-meta {
     align-items: flex-start;
     min-width: 0;
+    max-width: 100%;
   }
 
   .verdicts-refresh-text {
     text-align: left;
+    max-width: 100%;
   }
 
-  /* Hide verdict column on mobile — shown in reflection bar instead */
   .dashboard-grid > .verdict-result {
     display: none;
   }
@@ -3769,7 +3755,23 @@
   .decision-section-header:not(:has(.verdicts-remaining-pill)) {
     display: none;
   }
+}
 
+/* --- Phone (≤ 600px) --- */
+@media (max-width: 600px) {
+  .page {
+    padding: 1.5rem 0.5rem 2rem;
+    gap: 2rem;
+  }
+
+  .route-surface {
+    --surface-padding: 1.5rem;
+    border-radius: 16px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
   .decision-form {
     gap: 0.6rem;
   }
