@@ -66,6 +66,7 @@
 - [x] Fluid typography system — replaced 40+ fixed `rem`/`px` font-size values with `clamp()`-based fluid sizes scaling 375px→1440px; removed redundant `@media(max-width:600px)` font-size overrides; added fluid rem anchor on `:root`; SI card classes left untouched — **Branch:** `ui/fluid-typography`
 - [x] Mobile layout polish — Profile Verdicts button rows split into utility/decision/danger rows; Purchases and Resources cards use meta-chip pills instead of plain text; Swipe schedule queue moved below interaction; filter moved below heading with native `<select>` on mobile — **Branch:** `fix/mobile-layout-polish`
 - [x] Dashboard justification guidance polish — restored `Brand` input, added `10-30 words` guidance, and animated rotating probing questions under the justification textarea — **Branch:** `feature/justification-length-guidance`
+- [x] Hold reminder emails — added Resend-powered `/api/hold-reminders/run` scheduler endpoint to send due hold reminders and mark `hold_timers.notified` after delivery — **Branch:** `feat/hold-email-reminder`
 
 ---
 
@@ -86,7 +87,6 @@
 - [ ] Add warning modal if justification is too short — **Priority:** Medium
 - [ ] Add confidence indicator in verdict cards/modal from stored `confidence_score` — **Priority:** Medium
 - [ ] Implement `purchase_stats` aggregation population and surface segmented regret insights — **Priority:** High
-- [ ] Add hold duration and email reminder for "hold" verdicts (4.5.5) — **Priority:** Medium
 - [ ] Enable anonymous auth in Supabase dashboard: Authentication > Providers > Anonymous — **Priority:** High
 - [ ] Wire real `user_tier` into `trackVerdictRequested` (currently hardcoded `'free'`) — **Priority:** Low
 - [ ] Write content for About page — **Priority:** Low

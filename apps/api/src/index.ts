@@ -21,6 +21,7 @@ const adminEmails = (process.env.ADMIN_EMAILS ?? '')
 
 const openaiApiKey = process.env.OPENAI_API_KEY ?? ''
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+const holdReminderCronSecret = process.env.HOLD_REMINDER_CRON_SECRET ?? ''
 
 const posthog = new PostHog(process.env.POSTHOG_API_KEY ?? '', {
   host: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
@@ -232,6 +233,149 @@ const requireAdmin = async (
 }
 
 const supabase = () => createClient(supabaseUrl, supabaseServiceKey)
+
+type HoldReminderTimerRow = {
+  id: string
+  user_id: string
+  verdict_id: string
+  expires_at: string
+}
+
+type HoldReminderVerdictRow = {
+  id: string
+  candidate_title: string
+  candidate_price: number | null
+  candidate_vendor: string | null
+}
+
+const requireCronSecret = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  if (!holdReminderCronSecret) {
+    res.status(500).json({ error: 'Server misconfigured: missing hold reminder cron secret.' })
+    return
+  }
+
+  const authHeader = req.headers.authorization
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token || token !== holdReminderCronSecret) {
+    res.status(401).json({ error: 'Invalid scheduler credentials.' })
+    return
+  }
+
+  next()
+}
+
+const formatReminderPrice = (price: number | null): string => {
+  if (price === null || Number.isNaN(price)) {
+    return 'Price not recorded'
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  }).format(price)
+}
+
+const buildHoldReminderEmailHtml = ({
+  title,
+  brand,
+  price,
+  expiresAt,
+}: {
+  title: string
+  brand: string | null
+  price: number | null
+  expiresAt: string
+}) => {
+  const formattedPrice = formatReminderPrice(price)
+  const formattedRelease = new Date(expiresAt).toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your TruePick hold has ended</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0c10;font-family:'Outfit',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0c10;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+          <tr>
+            <td style="padding-bottom:32px;">
+              <span style="font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">TruePick</span>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background-color:#0f1115;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:36px 32px;">
+              <div style="display:inline-block;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);border-radius:999px;padding:4px 14px;margin-bottom:24px;">
+                <span style="font-size:12px;font-weight:600;color:#fcd34d;letter-spacing:0.4px;text-transform:uppercase;">Hold reminder</span>
+              </div>
+
+              <h1 style="margin:0 0 12px;font-size:26px;font-weight:700;color:#ffffff;line-height:1.25;letter-spacing:-0.4px;">
+                Your hold window has ended.
+              </h1>
+
+              <p style="margin:0 0 28px;font-size:15px;line-height:1.65;color:#94a3b8;">
+                You asked TruePick to slow this decision down. Your reminder is here so you can revisit the purchase with a clearer head.
+              </p>
+
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:18px 18px 16px;margin-bottom:28px;">
+                <p style="margin:0 0 8px;font-size:18px;font-weight:600;color:#ffffff;line-height:1.4;">${title}</p>
+                <p style="margin:0 0 6px;font-size:14px;color:#cbd5e1;line-height:1.5;">${formattedPrice}${brand ? ` · ${brand}` : ''}</p>
+                <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">Hold ended: ${formattedRelease}</p>
+              </div>
+
+              <div style="height:1px;background:rgba(255,255,255,0.07);margin-bottom:28px;"></div>
+
+              <p style="margin:0 0 12px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.6px;">Before you buy</p>
+              <table cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="padding-bottom:10px;">
+                    <span style="color:#f59e0b;font-size:14px;margin-right:10px;">&#8594;</span>
+                    <span style="font-size:14px;color:#cbd5e1;line-height:1.5;">Check whether the original reason still feels urgent.</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-bottom:10px;">
+                    <span style="color:#f59e0b;font-size:14px;margin-right:10px;">&#8594;</span>
+                    <span style="font-size:14px;color:#cbd5e1;line-height:1.5;">Compare it against one cheaper or non-purchase alternative.</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <span style="color:#f59e0b;font-size:14px;margin-right:10px;">&#8594;</span>
+                    <span style="font-size:14px;color:#cbd5e1;line-height:1.5;">If you still want it, buy deliberately instead of reactively.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding-top:24px;">
+              <p style="margin:0;font-size:12px;color:#334155;line-height:1.6;">
+                You received this because hold reminders are enabled in your TruePick settings.<br>
+                <a href="https://gettruepick.com" style="color:#475569;text-decoration:none;">gettruepick.com</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
 
 type ResourceUpsertBody = {
   slug: string
@@ -731,6 +875,116 @@ app.post('/api/waitlist', async (req, res) => {
   }
 
   res.json({ success: true })
+})
+
+app.post('/api/hold-reminders/run', requireCronSecret, async (_req, res) => {
+  if (!resend) {
+    res.status(500).json({ error: 'Resend API key not configured on server.' })
+    return
+  }
+
+  const nowIso = new Date().toISOString()
+  const { data: timers, error: timersError } = await supabase()
+    .from('hold_timers')
+    .select('id, user_id, verdict_id, expires_at')
+    .eq('notified', false)
+    .lte('expires_at', nowIso)
+    .order('expires_at', { ascending: true })
+    .limit(100)
+
+  if (timersError) {
+    res.status(500).json({ error: timersError.message })
+    return
+  }
+
+  const dueTimers = (timers ?? []) as HoldReminderTimerRow[]
+  if (dueTimers.length === 0) {
+    res.json({ success: true, processed: 0, sent: 0, skipped: 0, failed: 0 })
+    return
+  }
+
+  const userIds = [...new Set(dueTimers.map((timer) => timer.user_id))]
+  const verdictIds = [...new Set(dueTimers.map((timer) => timer.verdict_id))]
+
+  const [{ data: users, error: usersError }, { data: verdicts, error: verdictsError }] = await Promise.all([
+    supabase()
+      .from('users')
+      .select('id, email')
+      .in('id', userIds),
+    supabase()
+      .from('verdicts')
+      .select('id, candidate_title, candidate_price, candidate_vendor')
+      .in('id', verdictIds),
+  ])
+
+  if (usersError) {
+    res.status(500).json({ error: usersError.message })
+    return
+  }
+  if (verdictsError) {
+    res.status(500).json({ error: verdictsError.message })
+    return
+  }
+
+  const usersById = new Map(
+    (users ?? []).map((user) => [String(user.id), { email: String(user.email ?? '') }])
+  )
+  const verdictsById = new Map(
+    ((verdicts ?? []) as HoldReminderVerdictRow[]).map((verdict) => [verdict.id, verdict])
+  )
+
+  let sent = 0
+  let skipped = 0
+  let failed = 0
+
+  for (const timer of dueTimers) {
+    const user = usersById.get(timer.user_id)
+    const verdict = verdictsById.get(timer.verdict_id)
+
+    if (!user?.email || !verdict?.candidate_title) {
+      skipped += 1
+      continue
+    }
+
+    try {
+      await resend.emails.send({
+        from: 'TruePick <noreply@resila.ai>',
+        to: user.email,
+        subject: `Your TruePick hold ended: ${verdict.candidate_title}`,
+        html: buildHoldReminderEmailHtml({
+          title: verdict.candidate_title,
+          brand: verdict.candidate_vendor,
+          price: verdict.candidate_price,
+          expiresAt: timer.expires_at,
+        }),
+      })
+
+      const { error: updateError } = await supabase()
+        .from('hold_timers')
+        .update({ notified: true })
+        .eq('id', timer.id)
+        .eq('notified', false)
+
+      if (updateError) {
+        failed += 1
+        console.error('[HoldReminder] Failed to mark timer notified:', updateError.message, { timerId: timer.id })
+        continue
+      }
+
+      sent += 1
+    } catch (error) {
+      failed += 1
+      console.error('[HoldReminder] Failed to send reminder:', error, { timerId: timer.id })
+    }
+  }
+
+  res.json({
+    success: true,
+    processed: dueTimers.length,
+    sent,
+    skipped,
+    failed,
+  })
 })
 
 app.post('/api/embeddings/search', requireAuth, rateLimitLLM, async (req, res) => {
