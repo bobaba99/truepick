@@ -27,6 +27,21 @@ type DashboardProps = {
   session: Session | null
 }
 
+const JUSTIFICATION_WORD_MIN = 10
+const JUSTIFICATION_WORD_MAX = 100
+const JUSTIFICATION_PLACEHOLDERS = [
+  `Aim for ${JUSTIFICATION_WORD_MIN}-${JUSTIFICATION_WORD_MAX} words. What problem does this solve right now?`,
+  `Aim for ${JUSTIFICATION_WORD_MIN}-${JUSTIFICATION_WORD_MAX} words. Why do you need this now instead of later?`,
+  `Aim for ${JUSTIFICATION_WORD_MIN}-${JUSTIFICATION_WORD_MAX} words. What happens if you do not buy it this week?`,
+  `Aim for ${JUSTIFICATION_WORD_MIN}-${JUSTIFICATION_WORD_MAX} words. Is this replacing something essential or adding something new?`,
+]
+
+function countWords(value: string): number {
+  const trimmed = value.trim()
+  if (!trimmed) return 0
+  return trimmed.split(/\s+/).length
+}
+
 export default function Dashboard({ session }: DashboardProps) {
   const { preferences } = useUserPreferences()
   const { formatCurrency, formatDateTime } = useUserFormatting()
@@ -56,6 +71,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState('other')
   const [justification, setJustification] = useState('')
+  const [justificationPlaceholderIndex, setJustificationPlaceholderIndex] = useState(0)
   const [motivation, setMotivation] = useState<PurchaseMotivation | null>(null)
   const [importantPurchase, setImportantPurchase] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -66,6 +82,15 @@ export default function Dashboard({ session }: DashboardProps) {
   const [verdictsRemainingToday, setVerdictsRemainingToday] = useState<number | null>(null)
   const generationLockMessage =
     'Another verdict is currently being generated or regenerated. Please wait for it to finish.'
+  const justificationWordCount = countWords(justification)
+  const justificationGuidance =
+    justificationWordCount === 0
+      ? `Aim for ${JUSTIFICATION_WORD_MIN}-${JUSTIFICATION_WORD_MAX} words. The placeholder rotates with prompts if you need a starting point.`
+      : justificationWordCount < JUSTIFICATION_WORD_MIN
+        ? `${justificationWordCount} words. Add a bit more context for a stronger verdict.`
+        : justificationWordCount > JUSTIFICATION_WORD_MAX
+          ? `${justificationWordCount} words. Consider tightening this so the verdict stays focused.`
+          : `${justificationWordCount} words. This is a good level of detail.`
 
   const loadStats = useCallback(async () => {
     if (!session) return
@@ -97,6 +122,19 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return () => window.clearTimeout(timeoutId)
   }, [loadStats, loadRecentVerdicts])
+
+  useEffect(() => {
+    if (justification.trim().length > 0) {
+      setJustificationPlaceholderIndex(0)
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      setJustificationPlaceholderIndex((current) => (current + 1) % JUSTIFICATION_PLACEHOLDERS.length)
+    }, 3200)
+
+    return () => window.clearInterval(intervalId)
+  }, [justification])
 
   const trackFieldFocus = useCallback((fieldName: string) => {
     if (!formFieldsRef.current.has(fieldName)) {
@@ -669,10 +707,13 @@ export default function Dashboard({ session }: DashboardProps) {
                   value={justification}
                   onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setJustification(e.target.value)}
                   onFocus={() => trackFieldFocus('justification')}
-                  placeholder="I need it for work calls..."
+                  placeholder={JUSTIFICATION_PLACEHOLDERS[justificationPlaceholderIndex]}
                   rows={3}
                 />
               </GlassCard>
+              <p className="justification-guidance" aria-live="polite">
+                {justificationGuidance}
+              </p>
             </div>
 
             <div className="form-actions-row">

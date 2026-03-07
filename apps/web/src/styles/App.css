@@ -1756,6 +1756,13 @@
   color: var(--ink-700);
 }
 
+.justification-guidance {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-600);
+}
+
 /* Desktop-only helper */
 .desktop-only {
   display: revert;
