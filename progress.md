@@ -31,6 +31,7 @@
 ## In Progress
 
 - [ ] Refine Profile and history UX polish after recent structural updates — **Branch:** `fix/profile-history-ux-polish`
+- [ ] PostHog behavioural telemetry — **Branch:** `feat/posthog-behavioural-telemetry`
 
 ---
 
@@ -38,8 +39,12 @@
 
 ### 1. Go / No-Go (must complete before launch)
 
-- [ ] Enable anonymous auth in Supabase dashboard: Authentication > Providers > Anonymous
+- [x] Enable anonymous auth in Supabase dashboard: Authentication > Providers > Anonymous
   Why: The guest verdict flow depends on `signInAnonymously`; without this toggle, first-visit onboarding is broken. (5 min, zero code)
+- [ ] Google OAuth
+- [ ] Apple OAuth
+- [x] Onboarding tutorial `feat/onboarding-tutorial`
+- [x] Landing / home page with product explanation, psychology stats, premium waitlist — **Branch:** `feat/posthog-behavioural-telemetry`
 - [ ] Replace Privacy Policy boilerplate with real content — `Privacy.tsx` lines 37, 48, 51
   Why: Legal requirement per PRD 5.2; needed for OAuth verification and user trust.
 - [ ] Replace Terms of Service boilerplate with real content — `Terms.tsx` line 43
@@ -61,6 +66,8 @@
   Why: Page exists with FAQ link and Contact Us. Functional enough for soft launch.
 - [ ] Wire real `user_tier` into `trackVerdictRequested` instead of hardcoded `'free'` — **Priority:** Low
   Why: Technically correct at launch since all users ARE free tier. Only matters when premium exists.
+- [ ] Update landing page stats and product description with real/current data — **Priority:** Low
+  Why: Current stats ($3,400/yr, 90%, 44%) are sourced from PRD; update with verified citations or real user data post-launch.
 
 ### 3. Deferred Post-Launch
 
@@ -102,6 +109,7 @@
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-09 | Landing page + routing restructure | No public-facing page explaining the product; `/` went straight to auth-gated Dashboard | `/` is now a public landing with hero, how-it-works, psychology stats, premium waitlist; Dashboard moved to `/dashboard`; brand logo links to landing; onboarding tutorial completed |
 | 2026-03-05 | Mobile layout polish — Profile, Purchases, Resources, Swipe | Cards showed raw label:value text; buttons overflowed on mobile; swipe queue and filter were above the interaction | Meta-chip cards, clean button rows, and swipe UI reordered for natural mobile scroll flow |
 | 2026-03-05 | Fluid typography — clamp()-based font sizes across all major text elements | Text felt too small on desktop and cramped on mobile; fluid scaling eliminates single-breakpoint jumps | Smooth text scaling 375px→1440px with no manual mobile overrides needed |
 | 2026-03-05 | Soft-delete verdicts, regeneration limit bypass, verdicts remaining counter, Resend waitlist email | Prevent daily limit bypass via deletion; exempt regeneration; surface remaining count to user | Daily limit integrity enforced end-to-end; UX counter visible after first verdict |
@@ -164,3 +172,6 @@
 - [x] Mobile layout polish — Profile Verdicts button rows split into utility/decision/danger rows; Purchases and Resources cards use meta-chip pills instead of plain text; Swipe schedule queue moved below interaction; filter moved below heading with native `<select>` on mobile — **Branch:** `fix/mobile-layout-polish`
 - [x] Dashboard justification guidance polish — restored `Brand` input, added `10-30 words` guidance, and animated rotating probing questions under the justification textarea — **Branch:** `feature/justification-length-guidance`
 - [x] Hold reminder emails — added Resend-powered `/api/hold-reminders/run` scheduler endpoint to send due hold reminders and mark `hold_timers.notified` after delivery — **Branch:** `feat/hold-email-reminder`
+- [x] Onboarding tutorial — 5-step modal wizard (Welcome, Verdicts, Quiz CTA, Email Import CTA, Privacy), localStorage completion tracking, slide transitions, accessible focus management, 5 analytics events — **Branch:** `feat/onboarding-tutorial`
+- [x] Landing page — public home page at `/` with hero, 3-step "How It Works", psychology stats ($3,400/yr, 90% impulse, 44% no-buy), premium waitlist form (reuses `/api/waitlist`), footer CTA. Session-aware CTAs. Dashboard moved to `/dashboard`. Brand logo now links to landing. Responsive at all breakpoints — **Branch:** `feat/posthog-behavioural-telemetry`
+- [x] Nav bar auth buttons — Sign In / Sign Up buttons visible for anonymous users with active-state highlighting, press animation, responsive layout — **Branch:** `feat/posthog-behavioural-telemetry`

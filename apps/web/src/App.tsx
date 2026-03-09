@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import { supabase } from './api/core/supabaseClient'
 import Dashboard from './pages/Dashboard'
 import Swipe from './pages/Swipe'
@@ -8,6 +8,7 @@ import Profile from './pages/Profile'
 import Resources from './pages/Resources'
 import ResourceDetail from './pages/ResourceDetail'
 import AdminResources from './pages/AdminResources'
+import Landing from './pages/Landing'
 import About from './pages/About'
 import Support from './pages/Support'
 import FAQ from './pages/FAQ'
@@ -67,8 +68,8 @@ function RequireAuth({ session }: { session: Session | null }) {
 }
 
 function PublicOnly({ session, children }: { session: Session | null; children: React.ReactNode }) {
-  if (session) {
-    return <Navigate to="/" replace />
+  if (session && !session.user.is_anonymous) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return children
@@ -129,9 +130,13 @@ function AuthRoute({
 
       <section className="auth-card">
         <div className="card-header">
-          <h2>{session ? 'You are signed in' : 'Sign in to continue'}</h2>
+          <h2>{session && !session.user.is_anonymous
+            ? 'You are signed in'
+            : authMode === 'sign_up'
+              ? 'Create your account'
+              : 'Sign in to continue'}</h2>
           <p>
-            {session
+            {session && !session.user.is_anonymous
               ? 'Continue to your profile to see your latest data.'
               : 'Use the same email you will connect for receipt ingestion.'}
           </p>
@@ -148,7 +153,7 @@ function AuthRoute({
           <div className={`status ${status.type}`}>{status.message}</div>
         )}
 
-        {session ? (
+        {session && !session.user.is_anonymous ? (
           <div className="signed-in">
             <div>
               <span className="label">Signed in as </span>
@@ -264,7 +269,7 @@ function App() {
   }, [session])
 
   const headline = useMemo(() => {
-    if (session) {
+    if (session && !session.user.is_anonymous) {
       return 'Your regret mirror is ready.'
     }
 
@@ -311,8 +316,11 @@ function App() {
       return
     }
 
+    const isAnonymousConversion = authMode === 'sign_up' && isAnonymous
     const resultSession = 'session' in data ? data.session : null
-    if (authMode === 'sign_up' && !resultSession) {
+
+    if (authMode === 'sign_up' && !resultSession && !isAnonymousConversion) {
+      // Fresh sign-up without immediate session — email confirmation required
       setStatus({
         type: 'success',
         message:
@@ -321,8 +329,10 @@ function App() {
     } else {
       if (authMode === 'sign_up') {
         analytics.trackSignUp()
-        // Sync user record on account creation (skipped for anonymous users)
-        if (resultSession) {
+        if (isAnonymousConversion) {
+          // Anonymous → permanent: session is already live via onAuthStateChange
+          void syncUserRecord(session!)
+        } else if (resultSession) {
           void syncUserRecord(resultSession)
         }
       } else {
@@ -358,10 +368,10 @@ function App() {
         <div className="page">
           {gsapLoaded && <CustomCursor />}
           <header className={`topbar${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
-            <div className="brand">TruePick</div>
+            <Link to="/" className="brand">TruePick</Link>
             <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
               {session && (
-                <NavLink to="/" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
+                <NavLink to="/dashboard" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                   Dashboard
                 </NavLink>
               )}
@@ -391,7 +401,7 @@ function App() {
               )}
             </nav>
             <div className="top-actions">
-              {session ? (
+              {session && !session.user.is_anonymous ? (
                 <>
                   <div className="session-chip session-chip--desktop">
                     <span className="session-label">Signed in</span>
@@ -422,7 +432,33 @@ function App() {
                   </div>
                 </>
               ) : (
-                <span className="hint">Start with email + password</span>
+                <div className="auth-actions">
+                  <NavLink
+                    to="/auth"
+                    className={() =>
+                      `auth-action-btn${authMode === 'sign_in' ? ' auth-action-btn--active' : ''}`
+                    }
+                    onClick={() => {
+                      setAuthMode('sign_in')
+                      setMobileMenuOpen(false)
+                    }}
+                  >
+                    Sign in
+                  </NavLink>
+                  <NavLink
+                    to="/auth"
+                    className={() =>
+                      `auth-action-btn auth-action-btn--primary${authMode === 'sign_up' ? ' auth-action-btn--active' : ''}`
+                    }
+                    onClick={() => {
+                      setAuthMode('sign_up')
+                      setMobileMenuOpen(false)
+                    }}
+                    data-cursor="expand"
+                  >
+                    Sign up
+                  </NavLink>
+                </div>
               )}
             </div>
             <button
@@ -448,6 +484,7 @@ function App() {
               </div>
             ) : (
             <Routes>
+              <Route index element={<Landing session={session} />} />
               <Route
                 path="/auth"
                 element={
@@ -486,7 +523,7 @@ function App() {
 
               <Route element={<RequireAuth session={session} />}>
                 <Route element={<AppShell />}>
-                  <Route index element={<Dashboard session={session} />} />
+                  <Route path="dashboard" element={<Dashboard session={session} />} />
                   <Route path="swipe" element={<Swipe session={session} />} />
                   <Route path="profile" element={<Profile session={session} />} />
                   <Route
@@ -494,7 +531,7 @@ function App() {
                     element={
                       isAdminUser
                         ? <AdminResources session={session} />
-                        : <Navigate to="/" replace />
+                        : <Navigate to="/dashboard" replace />
                     }
                   />
                 </Route>
@@ -502,7 +539,7 @@ function App() {
 
               <Route
                 path="*"
-                element={<Navigate to={session ? '/' : '/auth'} replace />}
+                element={<Navigate to="/" replace />}
               />
             </Routes>
             )}

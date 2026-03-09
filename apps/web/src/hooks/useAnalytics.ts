@@ -337,6 +337,18 @@ const trackSharedVerdictViewed = () => trackEvent('shared_verdict_viewed')
 
 const trackSharedVerdictCtaClicked = () => trackEvent('shared_verdict_cta_clicked')
 
+const trackOnboardingStepViewed = (stepIndex: number, stepId: string) =>
+  trackEvent('onboarding_step_viewed', { step_index: stepIndex, step_id: stepId })
+
+const trackOnboardingCtaClicked = (stepId: string, ctaRoute: string) =>
+  trackEvent('onboarding_cta_clicked', { step_id: stepId, cta_route: ctaRoute })
+
+const trackWaitlistSubmitted = (source: string) =>
+  trackEvent('waitlist_submitted', { source })
+
+const trackLandingCtaClicked = (ctaId: string) =>
+  trackEvent('landing_cta_clicked', { cta_id: ctaId })
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -398,6 +410,10 @@ const analytics = {
   trackNavMenuOpened,
   trackSharedVerdictViewed,
   trackSharedVerdictCtaClicked,
+  trackOnboardingStepViewed,
+  trackOnboardingCtaClicked,
+  trackWaitlistSubmitted,
+  trackLandingCtaClicked,
 }
 
 export { analytics }
