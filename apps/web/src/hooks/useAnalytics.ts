@@ -151,6 +151,11 @@ const trackProfileUpdated = (hasBudget: boolean, quizSectionsFilled: number) =>
 const trackSettingsChanged = (settingName: string, newValue: string) =>
   trackEvent('settings_changed', { setting_name: settingName, new_value: newValue })
 
+const trackOnboardingStarted = () => trackEvent('onboarding_started')
+
+const trackOnboardingCompleted = (totalSteps: number) =>
+  trackEvent('onboarding_completed', { total_steps: totalSteps })
+
 // ---------------------------------------------------------------------------
 // Tier 1+: Paywall & Conversion Events
 // ---------------------------------------------------------------------------
@@ -286,6 +291,9 @@ const trackFormValidationError = (field: string, errorType: string) =>
 const trackSwipeLoadDuration = (durationMs: number, count: number) =>
   trackEvent('swipe_load_duration', { duration_ms: Math.round(durationMs), count })
 
+const trackOnboardingDismissed = (stepDismissedAt: number) =>
+  trackEvent('onboarding_dismissed', { step_dismissed_at: stepDismissedAt })
+
 // ---------------------------------------------------------------------------
 // Tier 3: Micro-Interactions
 // ---------------------------------------------------------------------------
@@ -354,6 +362,8 @@ const analytics = {
   trackPurchaseDeleted,
   trackProfileUpdated,
   trackSettingsChanged,
+  trackOnboardingStarted,
+  trackOnboardingCompleted,
 
   // Tier 2
   trackVerdictEvalStarted,
@@ -372,6 +382,7 @@ const analytics = {
   trackVerdictRegenDuration,
   trackFormValidationError,
   trackSwipeLoadDuration,
+  trackOnboardingDismissed,
 
   // Tier 3
   trackFormFieldFocused,

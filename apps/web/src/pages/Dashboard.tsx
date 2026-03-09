@@ -19,6 +19,7 @@ import VerdictDetailModal from '../components/VerdictDetailModal'
 import VerdictShareModal from '../components/VerdictShareModal'
 import EvaluatingModal from '../components/EvaluatingModal'
 import PaywallModal from '../components/PaywallModal'
+import OnboardingTutorial from '../components/onboarding/OnboardingTutorial'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
 import { useUserFormatting, useUserPreferences } from '../preferences/UserPreferencesContext'
 import { analytics, bucketPrice } from '../hooks/useAnalytics'
@@ -82,6 +83,7 @@ export default function Dashboard({ session }: DashboardProps) {
     activeHolds: 0,
   })
   const [recentVerdicts, setRecentVerdicts] = useState<VerdictRow[]>([])
+  const [verdictHistoryLoaded, setVerdictHistoryLoaded] = useState(false)
   const [selectedVerdict, setSelectedVerdict] = useState<VerdictRow | null>(null)
   const [shareModalVerdict, setShareModalVerdict] = useState<VerdictRow | null>(null)
   const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null)
@@ -137,16 +139,22 @@ export default function Dashboard({ session }: DashboardProps) {
 
   const loadRecentVerdicts = useCallback(async () => {
     if (!session) return
-    const data = await getVerdictHistory(session.user.id, 3)
-    setRecentVerdicts(data)
+    try {
+      const data = await getVerdictHistory(session.user.id, 3)
+      setRecentVerdicts(data)
 
-    const todayUtc = new Date()
-    todayUtc.setUTCHours(0, 0, 0, 0)
-    const usedToday = data.filter(
-      (v) => v.created_at !== null && new Date(v.created_at).getTime() >= todayUtc.getTime()
-    ).length
-    setVerdictsUsedToday(usedToday)
-    setVerdictsRemainingToday(Math.max(0, DAILY_LIMIT - usedToday))
+      const todayUtc = new Date()
+      todayUtc.setUTCHours(0, 0, 0, 0)
+      const usedToday = data.filter(
+        (v) => v.created_at !== null && new Date(v.created_at).getTime() >= todayUtc.getTime()
+      ).length
+      setVerdictsUsedToday(usedToday)
+      setVerdictsRemainingToday(Math.max(0, DAILY_LIMIT - usedToday))
+    } catch (error) {
+      logger.warn('Failed to load verdict history', { error: (error as Error).message })
+    } finally {
+      setVerdictHistoryLoaded(true)
+    }
   }, [session])
 
   useEffect(() => {
@@ -862,6 +870,13 @@ export default function Dashboard({ session }: DashboardProps) {
         />,
         document.body
       )}
+
+      <OnboardingTutorial
+        userId={session?.user.id ?? null}
+        hasVerdicts={recentVerdicts.length > 0}
+        dataLoaded={verdictHistoryLoaded}
+        onNavigate={(route) => navigate(route)}
+      />
     </section>
   )
 }

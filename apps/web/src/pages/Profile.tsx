@@ -45,6 +45,7 @@ import {
   normalizeUserPreferences,
 } from '../utils/userPreferences'
 import { analytics } from '../hooks/useAnalytics'
+import { clearOnboardingCompletion } from '../components/onboarding/useOnboardingTutorial'
 
 type ProfileProps = {
   session: Session | null
@@ -1215,6 +1216,22 @@ export default function Profile({ session }: ProfileProps) {
             </LiquidButton>
           </div>
         </div>
+      </div>
+
+      <div className="quiz-section">
+        <h3>Onboarding</h3>
+        <p>Revisit the welcome tutorial to learn about TruePick features.</p>
+        <LiquidButton
+          type="button"
+          className="quiz-chip"
+          onClick={() => {
+            const userId = session?.user.id
+            if (userId) clearOnboardingCompletion(userId)
+            navigate('/dashboard')
+          }}
+        >
+          Replay tutorial
+        </LiquidButton>
       </div>
 
       <div className="values-actions">
