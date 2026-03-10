@@ -63,20 +63,26 @@ export default function Landing({ session }: LandingProps) {
         </p>
         <div className="landing-hero-actions">
           {isSignedIn ? (
-            <LiquidButton as={Link} to="/dashboard" className="primary landing-hero-cta">
+            <LiquidButton as={Link} to="/dashboard" className="landing-hero-action landing-hero-cta">
               Go to Dashboard
             </LiquidButton>
           ) : (
             <LiquidButton
               as={Link}
               to="/dashboard"
-              className="primary landing-hero-cta"
+              className="landing-hero-action landing-hero-cta"
               onClick={() => analytics.trackLandingCtaClicked('hero_try_verdict')}
             >
               Try a free verdict
             </LiquidButton>
           )}
-          <LiquidButton as="a" href="#how-it-works" className="ghost landing-hero-secondary">
+          <LiquidButton
+            className="landing-hero-action landing-hero-secondary"
+            type="button"
+            onClick={() => {
+              document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          >
             See how it works
           </LiquidButton>
         </div>
@@ -144,7 +150,7 @@ export default function Landing({ session }: LandingProps) {
         <GlassCard className="landing-waitlist-card">
           <h2 className="landing-section-title">Premium is coming</h2>
           <p className="landing-waitlist-body">
-            Weekly spending pattern reports, personalized alternative suggestions,
+            Weekly spending pattern reports, Chrome extension, personalized alternative suggestions,
             ongoing email sync, and app-blocking during hold periods. Founding
             members get <strong>3 months free</strong>.
           </p>
@@ -185,14 +191,14 @@ export default function Landing({ session }: LandingProps) {
           No account required. Get your first verdict in under 60 seconds.
         </p>
         {isSignedIn ? (
-          <LiquidButton as={Link} to="/dashboard" className="primary landing-hero-cta">
+          <LiquidButton as={Link} to="/dashboard" className="landing-hero-cta">
             Go to Dashboard
           </LiquidButton>
         ) : (
           <LiquidButton
             as={Link}
             to="/dashboard"
-            className="primary landing-hero-cta"
+            className="landing-hero-cta"
             onClick={() => analytics.trackLandingCtaClicked('footer_try_verdict')}
           >
             Get your free verdict
