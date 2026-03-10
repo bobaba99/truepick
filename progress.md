@@ -31,7 +31,6 @@
 ## In Progress
 
 - [ ] Refine Profile and history UX polish after recent structural updates — **Branch:** `fix/profile-history-ux-polish`
-- [ ] PostHog behavioural telemetry — **Branch:** `feat/posthog-behavioural-telemetry`
 
 ---
 
@@ -177,3 +176,6 @@
 - [x] Onboarding tutorial — 5-step modal wizard (Welcome, Verdicts, Quiz CTA, Email Import CTA, Privacy), localStorage completion tracking, slide transitions, accessible focus management, 5 analytics events — **Branch:** `feat/onboarding-tutorial`
 - [x] Landing page — public home page at `/` with hero, 3-step "How It Works", psychology stats ($3,400/yr, 90% impulse, 44% no-buy), premium waitlist form (reuses `/api/waitlist`), footer CTA. Session-aware CTAs. Dashboard moved to `/dashboard`. Brand logo now links to landing. Responsive at all breakpoints — **Branch:** `feat/posthog-behavioural-telemetry`
 - [x] Nav bar auth buttons — Sign In / Sign Up buttons visible for anonymous users with active-state highlighting, press animation, responsive layout — **Branch:** `feat/posthog-behavioural-telemetry`
+- [x] Premium features page — public `/premium` page with Chrome extension features, unlimited verdicts, analytics/intelligence section, free vs premium comparison table, and waitlist signup — **Branch:** `feat/premium-page`
+- [x] Anonymous nav links — Home, How It Works, Premium links visible for non-logged-in users; `isSignedIn` variable extracted for cleaner session-aware rendering — **Branch:** `feat/posthog-behavioural-telemetry`
+- [x] Fixed nav bar visibility on landing and premium pages — disabled auto-hide scroll behavior on marketing pages — **Branch:** `fix/landing-nav-visible`
