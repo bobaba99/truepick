@@ -229,6 +229,12 @@ function App() {
   const gsapLoaded = useGSAPLoader()
 
   const handleScroll = useCallback(() => {
+    // Keep nav bar always visible on public marketing pages
+    if (window.location.pathname === '/' || window.location.pathname === '/premium') {
+      setHeaderHidden(false)
+      lastScrollY.current = window.scrollY
+      return
+    }
     const currentY = window.scrollY
     const shouldHide = currentY > lastScrollY.current && currentY > 80
     setHeaderHidden((prev) => (prev === shouldHide ? prev : shouldHide))
