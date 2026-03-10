@@ -312,6 +312,12 @@ function App() {
     return configuredAdminEmails.includes(email)
   }, [session])
 
+  const selectAuthAction = (mode: AuthMode, isAnonymous: boolean) => {
+    if (mode === 'sign_in') return supabase.auth.signInWithPassword({ email, password })
+    if (isAnonymous) return supabase.auth.updateUser({ email, password }) // converts anonymous → permanent
+    return supabase.auth.signUp({ email, password }) // fresh sign-up
+  }
+
   const handleAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setStatus(null)
@@ -328,12 +334,7 @@ function App() {
     setLoading(true)
 
     const isAnonymous = session?.user.is_anonymous ?? false
-    const action =
-      authMode === 'sign_in'
-        ? supabase.auth.signInWithPassword({ email, password })
-        : isAnonymous
-          ? supabase.auth.updateUser({ email, password })  // converts anonymous → permanent
-          : supabase.auth.signUp({ email, password })       // fresh sign-up
+    const action = selectAuthAction(authMode, isAnonymous)
 
     const { data, error } = await action
 

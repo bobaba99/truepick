@@ -28,6 +28,7 @@ type DashboardProps = {
   session: Session | null
 }
 
+const DAILY_LIMIT = 3
 const JUSTIFICATION_WORD_MIN = 10
 const JUSTIFICATION_WORD_MAX = 30
 const JUSTIFICATION_GUIDANCE_ROTATION_MS = 3200
@@ -135,8 +136,6 @@ export default function Dashboard({ session }: DashboardProps) {
     setStats(data)
   }, [session])
 
-  const DAILY_LIMIT = 3
-
   const loadRecentVerdicts = useCallback(async () => {
     if (!session) return
     try {
@@ -156,6 +155,28 @@ export default function Dashboard({ session }: DashboardProps) {
       setVerdictHistoryLoaded(true)
     }
   }, [session])
+
+  const handlePaywallError = useCallback((error: unknown) => {
+    if (
+      error instanceof Error &&
+      error.message === 'daily_limit_reached' &&
+      'paywallData' in error
+    ) {
+      const paywallData = (error as Error & { paywallData: Record<string, unknown> }).paywallData
+      const usedToday = (paywallData.verdicts_used_today as number | undefined) ?? DAILY_LIMIT
+      setVerdictsUsedToday(usedToday)
+      setVerdictsRemainingToday(0)
+      analytics.trackPaywallHit({
+        verdicts_used_today: usedToday,
+        session_verdicts_count: sessionVerdictsCountRef.current,
+        time_of_day: new Date().getUTCHours(),
+        day_of_week: new Date().getUTCDay(),
+      })
+      setPaywallOpen(true)
+      return true
+    }
+    return false
+  }, [])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -293,7 +314,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
       if (evaluation.verdictsRemaining !== undefined) {
         setVerdictsRemainingToday(evaluation.verdictsRemaining)
-        setVerdictsUsedToday(3 - evaluation.verdictsRemaining)
+        setVerdictsUsedToday(DAILY_LIMIT - evaluation.verdictsRemaining)
       }
 
       const { data: submittedVerdict, error } = await submitVerdict(session.user.id, input, evaluation)
@@ -328,25 +349,7 @@ export default function Dashboard({ session }: DashboardProps) {
       await loadStats()
       await loadRecentVerdicts()
     } catch (error) {
-      // Check for paywall (daily limit) error thrown from verdictLLM
-      if (
-        error instanceof Error &&
-        error.message === 'daily_limit_reached' &&
-        'paywallData' in error
-      ) {
-        const paywallData = (error as Error & { paywallData: Record<string, unknown> }).paywallData
-        const usedToday = (paywallData.verdicts_used_today as number | undefined) ?? 3
-        setVerdictsUsedToday(usedToday)
-        setVerdictsRemainingToday(0)
-        analytics.trackPaywallHit({
-          verdicts_used_today: usedToday,
-          session_verdicts_count: sessionVerdictsCountRef.current,
-          time_of_day: new Date().getUTCHours(),
-          day_of_week: new Date().getUTCDay(),
-        })
-        setPaywallOpen(true)
-        return
-      }
+      if (handlePaywallError(error)) return
       logger.error('Evaluation failed', { error: error instanceof Error ? error.message : String(error) })
       analytics.trackVerdictEvalError(error instanceof Error ? error.message : 'unknown')
       setStatus('Something went wrong while evaluating. Please try again.')
@@ -443,24 +446,7 @@ export default function Dashboard({ session }: DashboardProps) {
       }
       await loadStats()
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message === 'daily_limit_reached' &&
-        'paywallData' in error
-      ) {
-        const paywallData = (error as Error & { paywallData: Record<string, unknown> }).paywallData
-        const usedToday = (paywallData.verdicts_used_today as number | undefined) ?? 3
-        setVerdictsUsedToday(usedToday)
-        setVerdictsRemainingToday(0)
-        analytics.trackPaywallHit({
-          verdicts_used_today: usedToday,
-          session_verdicts_count: sessionVerdictsCountRef.current,
-          time_of_day: new Date().getUTCHours(),
-          day_of_week: new Date().getUTCDay(),
-        })
-        setPaywallOpen(true)
-        return
-      }
+      if (handlePaywallError(error)) return
       setStatus('Failed to regenerate verdict.')
     } finally {
       setVerdictRegeneratingId((currentVerdictId) =>
@@ -865,7 +851,7 @@ export default function Dashboard({ session }: DashboardProps) {
           onClose={() => setPaywallOpen(false)}
           onSignUp={() => { setPaywallOpen(false); navigate('/auth') }}
           verdictsUsedToday={verdictsUsedToday}
-          dailyLimit={3}
+          dailyLimit={DAILY_LIMIT}
           isAnonymous={session?.user.is_anonymous ?? false}
         />,
         document.body
