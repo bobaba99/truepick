@@ -88,6 +88,8 @@ const trackLogin = () => trackEvent('login', { method: 'email' })
 
 const trackSignOut = () => trackEvent('sign_out')
 
+const trackGuestContinued = () => trackEvent('guest_continued')
+
 const trackVerdictSubmitted = (params: {
   verdictValue: string
   category: string
@@ -366,6 +368,7 @@ const analytics = {
   trackShareCardGenerated,
   trackLogin,
   trackSignOut,
+  trackGuestContinued,
   trackVerdictSubmitted,
   trackVerdictDecision,
   trackVerdictRegenerated,
