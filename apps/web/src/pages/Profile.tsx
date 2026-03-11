@@ -283,7 +283,6 @@ export default function Profile({ session }: ProfileProps) {
       if (!data) {
         if (!session.user.email) {
           setUserRow(null)
-          setStatus('Profile not found and user email is missing.')
           return
         }
 
@@ -1301,16 +1300,33 @@ export default function Profile({ session }: ProfileProps) {
 
       {status && <div className="status error">{status}</div>}
 
-      <div className="profile-header-card">
-        <span className="value">{session?.user.email}</span>
-        {verdictsRemainingToday !== null && (
-          <span className={`verdicts-remaining-pill${verdictsRemainingToday === 0 ? ' exhausted' : ''}`}>
-            {verdictsRemainingToday === 0
-              ? 'Daily limit reached'
-              : `${verdictsRemainingToday} free verdict${verdictsRemainingToday === 1 ? '' : 's'} remaining today`}
-          </span>
-        )}
-      </div>
+      {session?.user.is_anonymous ? (
+        <GlassCard className="guest-profile-cta">
+          <h2>You're browsing as a guest</h2>
+          <p>
+            Sign up with email, Google, or Apple to save your verdicts,
+            quiz results, and preferences across devices.
+          </p>
+          <LiquidButton
+            className="primary"
+            type="button"
+            onClick={() => navigate('/auth')}
+          >
+            Create an account
+          </LiquidButton>
+        </GlassCard>
+      ) : (
+        <div className="profile-header-card">
+          <span className="value">{session?.user.email}</span>
+          {verdictsRemainingToday !== null && (
+            <span className={`verdicts-remaining-pill${verdictsRemainingToday === 0 ? ' exhausted' : ''}`}>
+              {verdictsRemainingToday === 0
+                ? 'Daily limit reached'
+                : `${verdictsRemainingToday} free verdict${verdictsRemainingToday === 1 ? '' : 's'} remaining today`}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="profile-tabs" role="tablist">
         <button

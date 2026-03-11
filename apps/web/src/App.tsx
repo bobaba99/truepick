@@ -30,6 +30,12 @@ import {
   hasAuthCallbackParams,
   shouldWaitForAuthSession,
 } from './utils/authFlow'
+import {
+  logAuthDebug,
+  summarizeErrorDebug,
+  summarizeAuthLocation,
+  summarizeSessionDebug,
+} from './utils/authDebug'
 import { hasSupabaseBrowserConfig } from './utils/supabaseEnv'
 
 type AuthMode = 'sign_in' | 'sign_up'
@@ -48,6 +54,9 @@ const configuredAdminEmails = (import.meta.env.VITE_ADMIN_EMAILS ?? '')
 const syncUserRecord = async (activeSession: Session) => {
   const email = activeSession.user.email
   if (!email) {
+    logAuthDebug('syncUserRecord skipped: missing email', {
+      session: summarizeSessionDebug(activeSession),
+    })
     return
   }
 
@@ -61,7 +70,10 @@ const syncUserRecord = async (activeSession: Session) => {
   )
 
   if (error) {
-    // Non-critical: user record sync failed, app continues normally
+      logAuthDebug('syncUserRecord failed', {
+        session: summarizeSessionDebug(activeSession),
+        error: summarizeErrorDebug(error),
+    }, 'error')
   }
 }
 
@@ -79,6 +91,25 @@ function PublicOnly({ session, children }: { session: Session | null; children: 
   }
 
   return children
+}
+
+function OAuthRedirector({
+  shouldRedirect,
+  onRedirected,
+}: {
+  shouldRedirect: boolean
+  onRedirected: () => void
+}) {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (shouldRedirect) {
+      onRedirected()
+      navigate('/dashboard', { replace: true })
+    }
+  }, [shouldRedirect, navigate, onRedirected])
+
+  return null
 }
 
 function AppShell() {
@@ -288,6 +319,8 @@ function App() {
   const [appleLoading, setAppleLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
+  const [oAuthJustCompleted, setOAuthJustCompleted] = useState(false)
+  const handleOAuthRedirected = useCallback(() => setOAuthJustCompleted(false), [])
   const [headerHidden, setHeaderHidden] = useState(false)
   const [headerScrolled, setHeaderScrolled] = useState(false)
   const lastScrollY = useRef(0)
@@ -316,7 +349,18 @@ function App() {
     const hasAuthCallback = hasAuthCallbackParams(window.location.hash, window.location.search)
     const authCallbackError = extractAuthCallbackError(window.location.hash, window.location.search)
 
+    logAuthDebug('auth bootstrap', {
+      hasSupabaseConfig,
+      hasAuthCallback,
+      authCallbackError,
+      location: summarizeAuthLocation(window.location.href),
+    })
+
     if (authCallbackError) {
+      logAuthDebug('auth callback error detected in URL', {
+        authCallbackError,
+        location: summarizeAuthLocation(window.location.href),
+      }, 'warn')
       setStatus({
         type: 'error',
         message: `OAuth sign-in failed: ${authCallbackError}`,
@@ -328,6 +372,10 @@ function App() {
     let oauthTimeout: ReturnType<typeof setTimeout> | undefined
     if (hasAuthCallback && !authCallbackError) {
       oauthTimeout = setTimeout(() => {
+        logAuthDebug('oauth timeout waiting for session', {
+          location: summarizeAuthLocation(window.location.href),
+          currentSession: summarizeSessionDebug(session),
+        }, 'warn')
         setStatus((current) => current ?? {
           type: 'error',
           message:
@@ -340,10 +388,16 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      logAuthDebug('onAuthStateChange', {
+        event,
+        session: summarizeSessionDebug(nextSession),
+        location: summarizeAuthLocation(window.location.href),
+      })
       setSession(nextSession)
       // After OAuth redirect, the SIGNED_IN event means the hash was consumed.
       if (hasAuthCallback && event === 'SIGNED_IN') {
         if (oauthTimeout) clearTimeout(oauthTimeout)
+        setOAuthJustCompleted(true)
         setSessionLoading(false)
       }
 
@@ -355,6 +409,11 @@ function App() {
     })
 
     supabase.auth.getSession().then(async ({ data }) => {
+      logAuthDebug('getSession resolved', {
+        session: summarizeSessionDebug(data.session),
+        hasAuthCallback,
+        authCallbackError,
+      })
       if (data.session) {
         setSession(data.session)
         if (!shouldWaitForAuthSession(
@@ -369,6 +428,10 @@ function App() {
         // No session and no OAuth callback — attempt anonymous sign-in so guests
         // get a real user_id. Falls through gracefully when disabled on the project.
         const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously()
+      logAuthDebug('bootstrap anonymous sign-in result', {
+        session: summarizeSessionDebug(anonData.session),
+        error: summarizeErrorDebug(anonError),
+      }, anonError ? 'warn' : 'log')
         if (!anonError && anonData.session) {
           setSession(anonData.session)
         } else if (anonError && window.location.pathname === '/auth') {
@@ -400,6 +463,7 @@ function App() {
   }, [session])
 
   const isSignedIn = session && !session.user.is_anonymous
+  const isAppUser = Boolean(session)
 
   const headline = useMemo(() => {
     if (isSignedIn) {
@@ -440,15 +504,31 @@ function App() {
     setLoading(true)
 
     const isAnonymous = session?.user.is_anonymous ?? false
+    logAuthDebug('email auth submit', {
+      mode: authMode,
+      isAnonymous,
+      hasEmail: Boolean(email),
+      emailDomain: email.includes('@') ? email.split('@')[1] : null,
+      session: summarizeSessionDebug(session),
+    })
     const action = selectAuthAction(authMode, isAnonymous)
 
     const { data, error } = await action
 
     if (error) {
+      logAuthDebug('email auth failed', {
+        mode: authMode,
+        error: summarizeErrorDebug(error),
+      }, 'error')
       setStatus({ type: 'error', message: error.message })
       setLoading(false)
       return
     }
+
+    logAuthDebug('email auth succeeded', {
+      mode: authMode,
+      session: summarizeSessionDebug('session' in data ? data.session : null),
+    })
 
     const isAnonymousConversion = authMode === 'sign_up' && isAnonymous
     const resultSession = 'session' in data ? data.session : null
@@ -493,6 +573,11 @@ function App() {
 
     setGoogleLoading(true)
     setStatus(null)
+    logAuthDebug('starting google oauth', {
+      redirectTo: buildOAuthRedirectUrl(window.location.origin),
+      location: summarizeAuthLocation(window.location.href),
+      session: summarizeSessionDebug(session),
+    })
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -502,6 +587,9 @@ function App() {
     })
 
     if (error) {
+      logAuthDebug('google oauth start failed', {
+        error: summarizeErrorDebug(error),
+      }, 'error')
       setStatus({ type: 'error', message: error.message })
       setGoogleLoading(false)
     }
@@ -519,6 +607,11 @@ function App() {
 
     setAppleLoading(true)
     setStatus(null)
+    logAuthDebug('starting apple oauth', {
+      redirectTo: buildOAuthRedirectUrl(window.location.origin),
+      location: summarizeAuthLocation(window.location.href),
+      session: summarizeSessionDebug(session),
+    })
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
@@ -528,6 +621,9 @@ function App() {
     })
 
     if (error) {
+      logAuthDebug('apple oauth start failed', {
+        error: summarizeErrorDebug(error),
+      }, 'error')
       setStatus({ type: 'error', message: error.message })
       setAppleLoading(false)
     }
@@ -535,6 +631,10 @@ function App() {
 
   const handleGuestContinue = async () => {
     analytics.trackGuestContinued()
+    logAuthDebug('guest continue clicked', {
+      session: summarizeSessionDebug(session),
+      location: summarizeAuthLocation(window.location.href),
+    })
 
     if (session) {
       return true
@@ -544,6 +644,10 @@ function App() {
     setStatus(null)
 
     const { data, error } = await supabase.auth.signInAnonymously()
+    logAuthDebug('guest anonymous sign-in result', {
+      session: summarizeSessionDebug(data.session),
+      error: summarizeErrorDebug(error),
+    }, error ? 'warn' : 'log')
 
     if (error || !data.session) {
       setStatus({
@@ -578,6 +682,10 @@ function App() {
 
   return (
     <BrowserRouter>
+      <OAuthRedirector
+        shouldRedirect={oAuthJustCompleted}
+        onRedirected={handleOAuthRedirected}
+      />
       <AnalyticsProvider session={session} sessionLoading={sessionLoading}>
       <UserPreferencesProvider session={session}>
         <div className="page">
@@ -585,7 +693,7 @@ function App() {
           <header className={`topbar${headerScrolled ? ' topbar--scrolled' : ''}${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
             <Link to="/" className="brand">TruePick</Link>
             <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>
-              {isSignedIn ? (
+              {isAppUser ? (
                 <>
                   <NavLink to="/dashboard" end className="nav-link" onClick={() => setMobileMenuOpen(false)}>
                     Dashboard
@@ -626,10 +734,10 @@ function App() {
               )}
             </nav>
             <div className="top-actions">
-              {isSignedIn ? (
+              {session ? (
                 <>
                   <div className="session-chip session-chip--desktop">
-                    <span className="session-label">Signed in</span>
+                    <span className="session-label">{isSignedIn ? 'Signed in' : 'Guest'}</span>
                     <span className="session-email">{session.user.email ?? 'Guest'}</span>
                     <LiquidButton
                       className="ghost"
