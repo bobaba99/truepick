@@ -47,6 +47,21 @@
 
 - Reevaluate prompts and alternative-solution generation separately from launch polish.
 
+## Remaining Refactoring — `refactor/modularize-codebase`
+
+- Extract Swipe.tsx (721 lines) — queue management and gesture hooks into separate modules.
+  Why: Below 800-line limit but tightly coupled; extract when adding new features to this file.
+- Split useAnalytics.ts (426 lines) — separate core init from event definitions.
+  Why: Single file mixes PostHog setup with 20+ event tracking functions; splitting improves discoverability.
+- Create ModalWrapper component for shared modal behavior (backdrop click, Escape key, portal).
+  Why: 5 modals in Profile.tsx duplicate the same backdrop/close pattern (~30 lines each).
+- Extract usePaginatedList hook from Profile/Dashboard for "Load more" pattern.
+  Why: Same slice/hasMore logic repeated in both pages.
+- Add Zod validation schemas for API POST/PUT bodies.
+  Why: Request body validation is currently manual if/else chains; Zod gives type-safe parsing.
+- Add barrel exports for components/, hooks/, api/ directories.
+  Why: Import paths are verbose; barrel files simplify consumer imports.
+
 ## Completed / Archived
 
 ### `fix/[]`
@@ -74,6 +89,14 @@
 - [x] Add the verdict share card generation as a modal dialog
 - [x] Implement social media sharing handles
 - [x] Implement image saving and sending to text message or email
+
+### `refactor/modularize-codebase`
+
+- [x] Split App.css (5,833 lines) into 6 modular files: tokens, layout, auth, components, modals, responsive
+- [x] Split Profile.tsx (2,084 → 1,546 lines) into 4 tab components + profileConstants.ts
+- [x] Split API index.ts (1,185 → 106 lines) into routes/, middleware/, emails/ modules with factory DI pattern
+- [x] Deduplicate auth middleware — extractBearerToken + validateSupabaseConfig shared helpers
+- [x] Extract Dashboard constants and utility functions to dashboardConstants.ts
 
 ### `feat/daily-limit`
 

@@ -32,6 +32,7 @@
 
 - [ ] Refine Profile and history UX polish after recent structural updates — **Branch:** `fix/profile-history-ux-polish`
 - [x] Fix OAuth & guest sign-in failures (Google, Apple, anonymous) — **Branch:** `main`
+- [x] Codebase modularization — critical/high/medium priority refactoring — **Branch:** `refactor/modularize-codebase`
 
 ---
 
@@ -115,6 +116,7 @@
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-11 | Codebase modularization — split monolithic files into focused modules | App.css (5,833 lines), Profile.tsx (2,084 lines), API index.ts (1,185 lines) exceeded maintainability limits | CSS split into 6 domain files; Profile split into 4 tab components + constants; API split into 12 files (routes/middleware/emails) with factory DI; auth middleware deduplicated; Dashboard constants extracted. All builds pass, zero behavior changes |
 | 2026-03-11 | Fix OAuth & guest sign-in failures | `handle_new_user()` trigger failed on NULL email (anon/Apple) and UNIQUE(email) conflict (returning Google users with new auth UUID); captcha blocked anonymous sign-in; nav bar didn't show app links for guests | Google, Apple, and guest sign-in all working; guest Profile shows sign-up CTA; nav shows app links for all sessions |
 | 2026-03-09 | Landing page + routing restructure | No public-facing page explaining the product; `/` went straight to auth-gated Dashboard | `/` is now a public landing with hero, how-it-works, psychology stats, premium waitlist; Dashboard moved to `/dashboard`; brand logo links to landing; onboarding tutorial completed |
 | 2026-03-05 | Mobile layout polish — Profile, Purchases, Resources, Swipe | Cards showed raw label:value text; buttons overflowed on mobile; swipe queue and filter were above the interaction | Meta-chip cards, clean button rows, and swipe UI reordered for natural mobile scroll flow |
@@ -187,4 +189,11 @@
 - [x] Premium features page — public `/premium` page with Chrome extension features, unlimited verdicts, analytics/intelligence section, free vs premium comparison table, and waitlist signup — **Branch:** `feat/premium-page`
 - [x] Anonymous nav links — Home, How It Works, Premium links visible for non-logged-in users; `isSignedIn` variable extracted for cleaner session-aware rendering — **Branch:** `feat/posthog-behavioural-telemetry`
 - [x] Fixed nav bar visibility on landing and premium pages — disabled auto-hide scroll behavior on marketing pages — **Branch:** `fix/landing-nav-visible`
+- [x] **Codebase modularization** — **Branch:** `refactor/modularize-codebase`
+  - CSS: App.css 5,833 → 7 lines (6 `@import`s): tokens.css, layout.css, auth.css, components.css, modals.css, responsive.css
+  - Web: Profile.tsx 2,084 → 1,546 lines: ProfileTabContent, VerdictsTab, PurchasesTab, SettingsTab components + profileConstants.ts
+  - Web: Dashboard.tsx 868 → 835 lines: dashboardConstants.ts (DAILY_LIMIT, countWords, formatCountdown, outcomeLabel)
+  - API: index.ts 1,185 → 106 lines: 5 route modules (admin, verdict, waitlist, holdReminders, openai), 3 middleware (auth, rateLimit, dailyLimit), 2 email templates, shared types
+  - API: auth middleware deduplicated — extractBearerToken + validateSupabaseConfig shared helpers
+  - Remaining low-priority items tracked in DEBT.md
 - [x] Fix OAuth & guest sign-in — 2 new migrations (`handle_new_user()` NULL email skip + UNIQUE email conflict handler), `OAuthRedirector` component for programmatic post-OAuth navigation, nav bar shows app links for all sessions (not just signed-in), guest Profile CTA card replaces error message — **Branch:** `main`
