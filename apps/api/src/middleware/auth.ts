@@ -3,6 +3,23 @@ import { createClient } from '@supabase/supabase-js'
 import type { PostHog } from 'posthog-node'
 import type { AuthenticatedRequest, AdminRequest } from '../types'
 
+const extractBearerToken = (req: express.Request): string | null => {
+  const authHeader = req.headers.authorization
+  return authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+}
+
+const validateSupabaseConfig = (
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  res: express.Response,
+): boolean => {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    res.status(500).json({ error: 'Server misconfigured: missing Supabase credentials.' })
+    return false
+  }
+  return true
+}
+
 export const createRequireAuth = (
   supabaseUrl: string,
   supabaseServiceKey: string,
@@ -13,16 +30,13 @@ export const createRequireAuth = (
     res: express.Response,
     next: express.NextFunction,
   ) => {
-    const authHeader = req.headers.authorization
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const token = extractBearerToken(req)
     if (!token) {
       res.status(401).json({ error: 'Missing or invalid Authorization header.' })
       return
     }
-    if (!supabaseUrl || !supabaseServiceKey) {
-      res.status(500).json({ error: 'Server misconfigured: missing Supabase credentials.' })
-      return
-    }
+    if (!validateSupabaseConfig(supabaseUrl, supabaseServiceKey, res)) return
+
     const sb = createClient(supabaseUrl, supabaseServiceKey)
     const {
       data: { user },
@@ -54,16 +68,13 @@ export const createRequireAdmin = (
     res: express.Response,
     next: express.NextFunction,
   ) => {
-    const authHeader = req.headers.authorization
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const token = extractBearerToken(req)
     if (!token) {
       res.status(401).json({ error: 'Missing or invalid Authorization header.' })
       return
     }
-    if (!supabaseUrl || !supabaseServiceKey) {
-      res.status(500).json({ error: 'Server misconfigured: missing Supabase credentials.' })
-      return
-    }
+    if (!validateSupabaseConfig(supabaseUrl, supabaseServiceKey, res)) return
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const {
       data: { user },
@@ -96,8 +107,7 @@ export const createRequireCronSecret = (cronSecret: string) => {
       return
     }
 
-    const authHeader = req.headers.authorization
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    const token = extractBearerToken(req)
     if (!token || token !== cronSecret) {
       res.status(401).json({ error: 'Invalid scheduler credentials.' })
       return
