@@ -52,6 +52,10 @@
   Why: Legal requirement per PRD 5.2; liability coverage.
 - [ ] Complete Profile and history UX polish — **Branch:** `fix/profile-history-ux-polish`
   Why: Core user-facing screen; rough UX harms first impressions and retention. Already in progress.
+- [ ] 10 articles in Resources for TruePick, putting the SEO and web search links deep as early as possible
+- [ ] Premium demo on Premium page
+- [ ] Polish verdict quality, to make it more acceptable and people are willing to sign up
+- [ ] Add verdict feedback (i.e., thumbs up and down) in the verdict cards
 
 ### 1b. Immediately After Launch (test on production)
 
