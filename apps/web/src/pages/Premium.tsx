@@ -134,6 +134,31 @@ export default function Premium() {
         </div>
       </div>
 
+      {/* ── Demo Preview ── */}
+      <div className="premium-section">
+        <h2 className="premium-section-title">See it in action</h2>
+        <p className="premium-section-subtitle">
+          A quick look at how TruePick Premium works in your daily browsing.
+        </p>
+
+        <GlassCard className="premium-demo-placeholder">
+          <div className="premium-demo-inner">
+            <div className="premium-demo-icon">
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="4" y="8" width="40" height="28" rx="4" stroke="currentColor" strokeWidth="2" />
+                <polygon points="20,16 32,22 20,28" fill="currentColor" opacity="0.6" />
+                <rect x="14" y="39" width="20" height="2" rx="1" fill="currentColor" opacity="0.3" />
+              </svg>
+            </div>
+            <p className="premium-demo-label">Interactive demo coming soon</p>
+            <p className="premium-demo-sublabel">
+              We&apos;re building a hands-on walkthrough of the checkout interstitial,
+              session awareness, and spending reports.
+            </p>
+          </div>
+        </GlassCard>
+      </div>
+
       {/* ── Unlimited Verdicts ── */}
       <div className="premium-section">
         <SplitText className="premium-section-title">Unlimited &amp; Refined Verdicts</SplitText>
