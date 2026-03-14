@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useModalAnimation } from './Kinematics'
 import { analytics } from '../hooks/useAnalytics'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
@@ -25,6 +26,7 @@ export default function PaywallModal({
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { shouldRender, backdropRef, contentRef } = useModalAnimation(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -36,7 +38,7 @@ export default function PaywallModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose()
@@ -77,13 +79,14 @@ export default function PaywallModal({
 
   return (
     <div
+      ref={backdropRef}
       className="modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-label="Daily limit reached"
       onClick={handleBackdropClick}
     >
-      <div className="paywall-modal">
+      <div ref={contentRef} className="paywall-modal">
         <button
           type="button"
           className="paywall-modal-close"

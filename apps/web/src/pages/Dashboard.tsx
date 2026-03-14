@@ -22,7 +22,8 @@ import EvaluatingModal from '../components/EvaluatingModal'
 import PaywallModal from '../components/PaywallModal'
 import GuestPromptModal from '../components/GuestPromptModal'
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial'
-import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
+import gsap from 'gsap'
+import { GlassCard, LiquidButton, VolumetricInput, SplitText, prefersReducedMotion } from '../components/Kinematics'
 import { useUserFormatting, useUserPreferences } from '../preferences/UserPreferencesContext'
 import { analytics, bucketPrice } from '../hooks/useAnalytics'
 import {
@@ -483,6 +484,27 @@ export default function Dashboard({ session }: DashboardProps) {
     })
   }
 
+  /* ── Verdict card stagger entrance ── */
+  useEffect(() => {
+    if (recentVerdicts.length === 0 || prefersReducedMotion()) return
+    gsap.fromTo(
+      '.verdict-stack-vertical .verdict-card',
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, stagger: 0.08, duration: 0.5, ease: 'power3.out' },
+    )
+  }, [recentVerdicts.length])
+
+  /* ── Form section fade-in on mount ── */
+  const formSectionRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!formSectionRef.current || prefersReducedMotion()) return
+    gsap.fromTo(
+      formSectionRef.current,
+      { opacity: 0, y: 15 },
+      { opacity: 1, y: 0, duration: 0.6, delay: 0.2, ease: 'power3.out' },
+    )
+  }, [])
+
   const emptyStateTrackedRef = useRef(false)
   useEffect(() => {
     if (recentVerdicts.length === 0 && !emptyStateTrackedRef.current && session) {
@@ -719,7 +741,7 @@ export default function Dashboard({ session }: DashboardProps) {
           )}
         </div>
 
-        <div className="decision-section">
+        <div className="decision-section" ref={formSectionRef}>
           <div className="decision-section-header">
             <h2>New evaluation</h2>
             {verdictsRemainingToday !== null && (

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useModalAnimation } from './Kinematics'
 
 const STATUS_MESSAGES = [
   'Analyzing your spending patterns...',
@@ -22,6 +23,7 @@ export default function EvaluatingModal({ isOpen }: EvaluatingModalProps) {
   const [fading, setFading] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const startRef = useRef<number | null>(null)
+  const { shouldRender, backdropRef, contentRef } = useModalAnimation(isOpen)
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,11 +56,11 @@ export default function EvaluatingModal({ isOpen }: EvaluatingModalProps) {
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-label="Evaluating purchase">
-      <div className="eval-modal-body">
+    <div ref={backdropRef} className="modal-backdrop" role="dialog" aria-label="Evaluating purchase">
+      <div ref={contentRef} className="eval-modal-body">
         <div className="eval-spinner" />
         <p className={`eval-status-text ${fading ? 'eval-status-fading' : ''}`}>
           {STATUS_MESSAGES[messageIndex]}

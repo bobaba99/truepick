@@ -793,7 +793,7 @@ export default function Profile({ session }: ProfileProps) {
         </button>
       </div>
 
-      <div className="profile-tab-content" role="tabpanel">
+      <div key={activeTab} className="profile-tab-content" role="tabpanel">
         {activeTab === 'profile' && (
           <ProfileTabContent
             profileSummary={profileSummary}

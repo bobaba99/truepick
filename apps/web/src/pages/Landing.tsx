@@ -1,7 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
+import gsap from 'gsap'
+import {
+  GlassCard,
+  LiquidButton,
+  ScrollReveal,
+  SplitText,
+  VolumetricInput,
+  prefersReducedMotion,
+  useCountUp,
+  useStaggerReveal,
+} from '../components/Kinematics'
 import { analytics } from '../hooks/useAnalytics'
 import './Landing.css'
 
@@ -18,6 +28,43 @@ export default function Landing({ session }: LandingProps) {
   const [error, setError] = useState<string | null>(null)
 
   const isSignedIn = session && !session.user.is_anonymous
+
+  /* ── Hero entrance animation (on mount, not scroll) ── */
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!heroRef.current || prefersReducedMotion()) return
+
+    const isMobile = window.matchMedia('(max-width: 600px)').matches
+    const d = isMobile ? [0.05, 0.15, 0.25, 0.35] : [0.1, 0.25, 0.45, 0.6]
+
+    const ctx = gsap.context(() => {
+      const pairs: [string, number, number][] = [
+        ['.landing-badge', d[0], 0.5],
+        ['.landing-headline', d[1], 0.7],
+        ['.landing-subheadline', d[2], 0.6],
+        ['.landing-hero-actions', d[3], 0.5],
+      ]
+      for (const [sel, delay, dur] of pairs) {
+        gsap.fromTo(sel, { opacity: 0, y: sel === '.landing-headline' ? 30 : 20 }, {
+          opacity: 1, y: 0, delay, duration: dur, ease: 'power3.out',
+        })
+      }
+    }, heroRef)
+
+    return () => ctx.revert()
+  }, [])
+
+  /* ── Stagger: How It Works cards ── */
+  const stepsRef = useStaggerReveal('.landing-step-card', { stagger: 0.12, y: 30 })
+
+  /* ── Stagger: Stats cards ── */
+  const statsContainerRef = useStaggerReveal('.landing-stat-card', { stagger: 0.12, y: 30 })
+
+  /* ── CountUp: stat values ── */
+  const statDollarRef = useCountUp(3400, { prefix: '$' })
+  const statPercentRef = useCountUp(90, { suffix: '%' })
+  const statPercent2Ref = useCountUp(44, { suffix: '%' })
 
   const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -51,7 +98,7 @@ export default function Landing({ session }: LandingProps) {
   return (
     <section className="landing">
       {/* ── Hero ── */}
-      <div className="landing-hero">
+      <div className="landing-hero" ref={heroRef}>
         <span className="landing-badge">AI-powered purchase decisions</span>
         <h1 className="landing-headline">
           Stop paying the impulse tax.
@@ -90,12 +137,12 @@ export default function Landing({ session }: LandingProps) {
 
       {/* ── How It Works ── */}
       <div className="landing-section" id="how-it-works">
-        <h2 className="landing-section-title">How It Works</h2>
+        <SplitText className="landing-section-title">How It Works</SplitText>
         <p className="landing-section-subtitle">
           Three steps between you and buyer&apos;s remorse.
         </p>
 
-        <div className="landing-steps">
+        <div className="landing-steps" ref={stepsRef}>
           <GlassCard className="landing-step-card">
             <div className="landing-step-number">1</div>
             <h3>Submit your purchase</h3>
@@ -118,24 +165,24 @@ export default function Landing({ session }: LandingProps) {
 
       {/* ── Psychology Stats ── */}
       <div className="landing-section landing-stats-section">
-        <h2 className="landing-section-title">The Psychology of Regret</h2>
+        <SplitText className="landing-section-title">The Psychology of Regret</SplitText>
         <p className="landing-section-subtitle">
           Purchase regret is universal — and preventable.
         </p>
 
-        <div className="landing-stats">
+        <div className="landing-stats" ref={statsContainerRef}>
           <GlassCard className="landing-stat-card">
-            <span className="landing-stat-value">$3,400</span>
+            <span className="landing-stat-value" ref={statDollarRef}>$0</span>
             <span className="landing-stat-label">spent on impulse buys per person, per year</span>
           </GlassCard>
 
           <GlassCard className="landing-stat-card">
-            <span className="landing-stat-value">90%</span>
+            <span className="landing-stat-value" ref={statPercentRef}>0%</span>
             <span className="landing-stat-label">of Gen Z and Millennials report impulse buying</span>
           </GlassCard>
 
           <GlassCard className="landing-stat-card">
-            <span className="landing-stat-value">44%</span>
+            <span className="landing-stat-value" ref={statPercent2Ref}>0%</span>
             <span className="landing-stat-label">of Americans are considering no-buy challenges</span>
           </GlassCard>
         </div>
@@ -146,9 +193,9 @@ export default function Landing({ session }: LandingProps) {
       </div>
 
       {/* ── Premium Waitlist ── */}
-      <div className="landing-section landing-waitlist-section" id="waitlist">
+      <ScrollReveal className="landing-section landing-waitlist-section" id="waitlist">
         <GlassCard className="landing-waitlist-card">
-          <h2 className="landing-section-title">Premium is coming</h2>
+          <SplitText className="landing-section-title">Premium is coming</SplitText>
           <p className="landing-waitlist-body">
             Weekly spending pattern reports, Chrome extension, personalized alternative suggestions,
             ongoing email sync, and app-blocking during hold periods. Founding
@@ -180,13 +227,13 @@ export default function Landing({ session }: LandingProps) {
             </form>
           )}
         </GlassCard>
-      </div>
+      </ScrollReveal>
 
       {/* ── Footer CTA ── */}
-      <div className="landing-section landing-footer-cta">
-        <h2 className="landing-footer-heading">
+      <ScrollReveal className="landing-section landing-footer-cta">
+        <SplitText className="landing-footer-heading">
           Your future self will thank you.
-        </h2>
+        </SplitText>
         <p className="landing-footer-body">
           No account required. Get your first verdict in under 60 seconds.
         </p>
@@ -204,7 +251,7 @@ export default function Landing({ session }: LandingProps) {
             Get your free verdict
           </LiquidButton>
         )}
-      </div>
+      </ScrollReveal>
 
       {/* ── Site footer ── */}
       <footer className="landing-footer">

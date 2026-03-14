@@ -7,26 +7,10 @@ import {
   type ElementType,
   type ReactNode,
 } from 'react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
-type GsapSetter = (value: number) => void
-type GsapVars = Record<string, unknown>
-type GsapContext = { revert: () => void }
-
-type GsapApi = {
-  quickTo: (target: object | null, property: string, vars: GsapVars) => GsapSetter
-  set: (target: object | null, vars: GsapVars) => void
-  to: (target: object | null, vars: GsapVars) => void
-  fromTo: (target: object | null, fromVars: GsapVars, toVars: GsapVars) => void
-  context: (callback: () => void, scope?: object | null) => GsapContext
-  registerPlugin: (plugin: unknown) => void
-}
-
-declare global {
-  interface Window {
-    gsap?: GsapApi
-    ScrollTrigger?: unknown
-  }
-}
+gsap.registerPlugin(ScrollTrigger)
 
 type PolymorphicProps<C extends ElementType, Props extends object = object> = Props & {
   as?: C
@@ -47,53 +31,232 @@ const isDisableableElement = (
 ): element is HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
   'disabled' in element
 
+/* ── Accessibility ── */
+
+export const prefersReducedMotion = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Legacy hook — now always returns true since GSAP is bundled via npm.
+ * Kept for backward compatibility with consumers that gate on `gsapReady`.
+ */
 export const useGSAPLoader = () => {
-  const [loaded, setLoaded] = useState(
-    () => Boolean(window.gsap && window.ScrollTrigger),
-  )
+  const [loaded] = useState(true)
+  return loaded
+}
+
+/* ── Scroll Animation Primitives ── */
+
+export const useScrollReveal = (
+  options?: {
+    y?: number
+    duration?: number
+    delay?: number
+    start?: string
+  },
+) => {
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (window.gsap && window.ScrollTrigger) {
+    if (!ref.current) return
+    if (prefersReducedMotion()) {
+      gsap.set(ref.current, { opacity: 1, y: 0 })
       return
     }
 
-    const loadScript = (src: string) =>
-      new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = src
-        script.async = true
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error(`Failed to load ${src}`))
-        document.body.appendChild(script)
-      })
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        ref.current,
+        { opacity: 0, y: options?.y ?? 40 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: options?.duration ?? 0.7,
+          delay: options?.delay ?? 0,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: ref.current,
+            start: options?.start ?? 'top 88%',
+          },
+        },
+      )
+    }, ref)
 
-    void Promise.all([
-      loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js'),
-      loadScript('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js'),
-    ])
-      .then(() => {
-        setTimeout(() => {
-          if (window.gsap && window.ScrollTrigger) {
-            window.gsap.registerPlugin(window.ScrollTrigger)
-            setLoaded(true)
-          }
-        }, 50)
-      })
-      .catch((error) => console.error('GSAP load failed', error))
+    return () => ctx.revert()
   }, [])
 
-  return loaded
+  return ref
 }
+
+export const ScrollReveal = ({
+  children,
+  className,
+  y = 40,
+  duration = 0.7,
+  delay = 0,
+  start = 'top 88%',
+  ...divProps
+}: {
+  children: ReactNode
+  className?: string
+  y?: number
+  duration?: number
+  delay?: number
+  start?: string
+} & Omit<ComponentPropsWithoutRef<'div'>, 'children'>) => {
+  const ref = useScrollReveal({ y, duration, delay, start })
+  return (
+    <div ref={ref} className={`scroll-reveal-init ${className ?? ''}`} {...divProps}>
+      {children}
+    </div>
+  )
+}
+
+export const useStaggerReveal = (
+  itemSelector: string,
+  options?: {
+    y?: number
+    stagger?: number
+    duration?: number
+    start?: string
+  },
+) => {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+
+    const items = ref.current.querySelectorAll(itemSelector)
+    if (!items.length) return
+
+    if (prefersReducedMotion()) {
+      items.forEach((item) => gsap.set(item, { opacity: 1, y: 0 }))
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        items,
+        { opacity: 0, y: options?.y ?? 30 },
+        {
+          opacity: 1,
+          y: 0,
+          stagger: options?.stagger ?? 0.1,
+          duration: options?.duration ?? 0.6,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: ref.current,
+            start: options?.start ?? 'top 85%',
+          },
+        },
+      )
+    }, ref)
+
+    return () => ctx.revert()
+  }, [])
+
+  return ref
+}
+
+export const useCountUp = (
+  endValue: number,
+  options?: {
+    prefix?: string
+    suffix?: string
+    duration?: number
+    decimals?: number
+  },
+) => {
+  const ref = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+
+    const el = ref.current
+    const formatted = options?.decimals
+      ? endValue.toFixed(options.decimals)
+      : Math.round(endValue).toLocaleString()
+    const finalText = `${options?.prefix ?? ''}${formatted}${options?.suffix ?? ''}`
+
+    if (prefersReducedMotion()) {
+      el.textContent = finalText
+      return
+    }
+
+    const proxy = { val: 0 }
+
+    const ctx = gsap.context(() => {
+      gsap.to(proxy, {
+        val: endValue,
+        duration: options?.duration ?? 1.5,
+        ease: 'power2.out',
+        scrollTrigger: {
+          trigger: el,
+          start: 'top 90%',
+        },
+        onUpdate: () => {
+          const current = options?.decimals
+            ? proxy.val.toFixed(options.decimals)
+            : Math.round(proxy.val).toLocaleString()
+          el.textContent = `${options?.prefix ?? ''}${current}${options?.suffix ?? ''}`
+        },
+        onComplete: () => {
+          el.textContent = finalText
+        },
+      })
+    })
+
+    return () => ctx.revert()
+  }, [endValue])
+
+  return ref
+}
+
+/* ── Modal Animation ── */
+
+export const useModalAnimation = (isOpen: boolean, duration = 0.2) => {
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true)
+    } else if (shouldRender) {
+      if (prefersReducedMotion() || !backdropRef.current) {
+        setShouldRender(false)
+        return
+      }
+      gsap.to(backdropRef.current, { opacity: 0, duration, ease: 'power2.in' })
+      if (contentRef.current) {
+        gsap.to(contentRef.current, {
+          opacity: 0,
+          y: 15,
+          scale: 0.98,
+          duration,
+          ease: 'power2.in',
+          onComplete: () => { setShouldRender(false) },
+        })
+      } else {
+        setShouldRender(false)
+      }
+    }
+  }, [isOpen])
+
+  return { shouldRender, backdropRef, contentRef }
+}
+
+/* ── Interactive Primitives ── */
 
 export const useMagnetic = (strength = 0.35) => {
   const ref = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (!window.gsap || !ref.current) return
+    if (!ref.current || prefersReducedMotion()) return
 
     const el = ref.current
-    const xTo = window.gsap.quickTo(el, 'x', { duration: 1, ease: 'power3.out' })
-    const yTo = window.gsap.quickTo(el, 'y', { duration: 1, ease: 'power3.out' })
+    const xTo = gsap.quickTo(el, 'x', { duration: 1, ease: 'power3.out' })
+    const yTo = gsap.quickTo(el, 'y', { duration: 1, ease: 'power3.out' })
 
     const handleMouseMove = (event: MouseEvent) => {
       const { clientX, clientY } = event
@@ -148,18 +311,20 @@ export const CustomCursor = () => {
   const ringRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!window.gsap) return
+    if (prefersReducedMotion()) return
 
     const dot = dotRef.current
     const ring = ringRef.current
-    window.gsap.set(dot, { xPercent: -50, yPercent: -50 })
-    window.gsap.set(ring, { xPercent: -50, yPercent: -50 })
+    if (!dot || !ring) return
 
-    const xTo = window.gsap.quickTo(ring, 'x', { duration: 0.6, ease: 'power3' })
-    const yTo = window.gsap.quickTo(ring, 'y', { duration: 0.6, ease: 'power3' })
+    gsap.set(dot, { xPercent: -50, yPercent: -50 })
+    gsap.set(ring, { xPercent: -50, yPercent: -50 })
+
+    const xTo = gsap.quickTo(ring, 'x', { duration: 0.6, ease: 'power3' })
+    const yTo = gsap.quickTo(ring, 'y', { duration: 0.6, ease: 'power3' })
 
     const onMouseMove = (event: MouseEvent) => {
-      window.gsap?.set(dot, { x: event.clientX, y: event.clientY })
+      gsap.set(dot, { x: event.clientX, y: event.clientY })
       xTo(event.clientX)
       yTo(event.clientY)
     }
@@ -167,14 +332,14 @@ export const CustomCursor = () => {
     const onHoverStart = (event: MouseEvent) => {
       const target = event.target as HTMLElement
       if (target.closest('[data-cursor="expand"]')) {
-        window.gsap?.to(ring, { scale: 2, duration: 0.3 })
+        gsap.to(ring, { scale: 2, duration: 0.3 })
       }
     }
 
     const onHoverEnd = (event: MouseEvent) => {
       const target = event.target as HTMLElement
       if (target.closest('[data-cursor="expand"]')) {
-        window.gsap?.to(ring, { scale: 1, duration: 0.3 })
+        gsap.to(ring, { scale: 1, duration: 0.3 })
       }
     }
 
@@ -207,12 +372,19 @@ export const SplitText = ({
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!window.gsap || !window.ScrollTrigger || !ref.current) return
+    if (!ref.current) return
 
-    const ctx = window.gsap.context(() => {
+    if (prefersReducedMotion()) {
+      const words = ref.current.querySelectorAll('.word')
+      words.forEach((word) => gsap.set(word, { y: '0%', rotateX: 0, opacity: 1 }))
+      return
+    }
+
+    const ctx = gsap.context(() => {
       const words = ref.current?.querySelectorAll('.word')
-      window.gsap?.fromTo(
-        words as unknown as object | null,
+      if (!words) return
+      gsap.fromTo(
+        words,
         { y: '110%', rotateX: -40, opacity: 0 },
         {
           y: '0%',
@@ -297,24 +469,24 @@ export const LiquidButton = <C extends ElementType = 'button'>({
   const ref = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (!window.gsap || !ref.current) return
+    if (!ref.current || prefersReducedMotion()) return
     const el = ref.current
 
     const onMouseDown = () => {
-      window.gsap?.to(el, { scale: 0.98, duration: 0.1, ease: 'power1.out' })
+      gsap.to(el, { scale: 0.98, duration: 0.1, ease: 'power1.out' })
     }
 
     const onMouseUp = () => {
-      window.gsap?.to(el, {
+      gsap.to(el, {
         scale: 1.05,
         duration: 0.15,
         ease: 'power2.out',
         onComplete: () => {
-          window.gsap?.to(el, {
+          gsap.to(el, {
             scale: 1,
             duration: 0.4,
             ease: 'elastic.out(1, 0.3)',
-            onComplete: () => window.gsap?.set(el, { clearProps: 'transform' }),
+            onComplete: () => { gsap.set(el, { clearProps: 'transform' }) },
           })
         },
       })
@@ -348,7 +520,7 @@ export const LiquidButton = <C extends ElementType = 'button'>({
       el.appendChild(ripple)
       const size = Math.max(rect.width, rect.height) * 2.5
 
-      window.gsap?.to(ripple, {
+      gsap.to(ripple, {
         width: size,
         height: size,
         opacity: 0,
@@ -360,7 +532,7 @@ export const LiquidButton = <C extends ElementType = 'button'>({
       })
     }
 
-    const ctx = window.gsap.context(() => {
+    const ctx = gsap.context(() => {
       el.addEventListener('mousedown', onMouseDown)
       el.addEventListener('mouseup', onMouseUp)
       el.addEventListener('mousemove', onMouseMove)
@@ -406,7 +578,7 @@ export const VolumetricInput = <C extends ElementType = 'input'>({
   const ref = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (!window.gsap || !ref.current) return
+    if (!ref.current) return
     const el = ref.current
 
     const updateGlow = (event: MouseEvent) => {

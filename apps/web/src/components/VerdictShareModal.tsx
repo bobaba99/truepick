@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useModalAnimation } from './Kinematics'
 import type { VerdictRow, ShareBackground, LLMEvaluationReasoning } from '../constants/verdictTypes'
 import { createSharedVerdict, buildShareUrl } from '../api/verdict/shareService'
 import { buildShareImageHtml, renderShareImageToBlob } from '../utils/verdictImageGenerator'
@@ -51,6 +52,7 @@ export default function VerdictShareModal({
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { shouldRender, backdropRef, contentRef } = useModalAnimation(isOpen)
 
   const shareLinkStartRef = useRef<number>(0)
 
@@ -94,7 +96,7 @@ export default function VerdictShareModal({
     }
   }, [])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   const imageHtml = buildShareImageHtml({
     product: verdict.candidate_title,
@@ -226,6 +228,7 @@ export default function VerdictShareModal({
   return (
     <>
       <div
+        ref={backdropRef}
         className="share-modal-overlay open"
         onClick={handleBackdropClick}
         onKeyDown={handleKeyDown}
@@ -234,7 +237,7 @@ export default function VerdictShareModal({
         aria-label="Share verdict"
         tabIndex={-1}
       >
-        <div className="share-modal">
+        <div ref={contentRef} className="share-modal">
           <div className="share-modal-header">
             <span className="share-modal-title">Share Verdict</span>
             <button

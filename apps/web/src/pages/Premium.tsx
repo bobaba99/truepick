@@ -1,5 +1,14 @@
-import { useState } from 'react'
-import { GlassCard, LiquidButton, VolumetricInput } from '../components/Kinematics'
+import { useEffect, useRef, useState } from 'react'
+import gsap from 'gsap'
+import {
+  GlassCard,
+  LiquidButton,
+  ScrollReveal,
+  SplitText,
+  VolumetricInput,
+  prefersReducedMotion,
+  useStaggerReveal,
+} from '../components/Kinematics'
 import { analytics } from '../hooks/useAnalytics'
 import './Premium.css'
 
@@ -10,6 +19,36 @@ export default function Premium() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /* ── Hero entrance animation (on mount) ── */
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!heroRef.current || prefersReducedMotion()) return
+
+    const isMobile = window.matchMedia('(max-width: 600px)').matches
+    const d = isMobile ? [0.05, 0.15, 0.25] : [0.1, 0.25, 0.45]
+
+    const ctx = gsap.context(() => {
+      const pairs: [string, number, number][] = [
+        ['.premium-badge', d[0], 0.5],
+        ['.premium-headline', d[1], 0.7],
+        ['.premium-subheadline', d[2], 0.6],
+      ]
+      for (const [sel, delay, dur] of pairs) {
+        gsap.fromTo(sel, { opacity: 0, y: sel === '.premium-headline' ? 30 : 20 }, {
+          opacity: 1, y: 0, delay, duration: dur, ease: 'power3.out',
+        })
+      }
+    }, heroRef)
+
+    return () => ctx.revert()
+  }, [])
+
+  /* ── Stagger: feature card grids ── */
+  const extensionRef = useStaggerReveal('.premium-feature-card', { stagger: 0.1, y: 30 })
+  const verdictsRef = useStaggerReveal('.premium-feature-card', { stagger: 0.1, y: 30 })
+  const analyticsRef = useStaggerReveal('.premium-feature-card', { stagger: 0.1, y: 30 })
 
   const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -43,7 +82,7 @@ export default function Premium() {
   return (
     <section className="premium-page">
       {/* ── Hero ── */}
-      <div className="premium-hero">
+      <div className="premium-hero" ref={heroRef}>
         <span className="premium-badge">Coming soon</span>
         <h1 className="premium-headline">
           TruePick Premium
@@ -56,12 +95,12 @@ export default function Premium() {
 
       {/* ── Chrome Extension ── */}
       <div className="premium-section">
-        <h2 className="premium-section-title">Chrome Extension</h2>
+        <SplitText className="premium-section-title">Chrome Extension</SplitText>
         <p className="premium-section-subtitle">
           Your purchase therapist, built into the browser.
         </p>
 
-        <div className="premium-features">
+        <div className="premium-features" ref={extensionRef}>
           <GlassCard className="premium-feature-card">
             <div className="premium-feature-icon">🔍</div>
             <h3>Session Awareness</h3>
@@ -97,12 +136,12 @@ export default function Premium() {
 
       {/* ── Unlimited Verdicts ── */}
       <div className="premium-section">
-        <h2 className="premium-section-title">Unlimited &amp; Refined Verdicts</h2>
+        <SplitText className="premium-section-title">Unlimited &amp; Refined Verdicts</SplitText>
         <p className="premium-section-subtitle">
           No daily cap. Deeper reasoning that references your values and history.
         </p>
 
-        <div className="premium-features premium-features--two">
+        <div className="premium-features premium-features--two" ref={verdictsRef}>
           <GlassCard className="premium-feature-card">
             <div className="premium-feature-icon">♾️</div>
             <h3>Unlimited Verdicts</h3>
@@ -125,12 +164,12 @@ export default function Premium() {
 
       {/* ── Analytics & Intelligence ── */}
       <div className="premium-section">
-        <h2 className="premium-section-title">Analytics &amp; Intelligence</h2>
+        <SplitText className="premium-section-title">Analytics &amp; Intelligence</SplitText>
         <p className="premium-section-subtitle">
           Turn purchase data into actionable spending insights.
         </p>
 
-        <div className="premium-features">
+        <div className="premium-features" ref={analyticsRef}>
           <GlassCard className="premium-feature-card">
             <div className="premium-feature-icon">📊</div>
             <h3>Spending Reports</h3>
@@ -164,8 +203,8 @@ export default function Premium() {
       </div>
 
       {/* ── Tier Comparison ── */}
-      <div className="premium-section">
-        <h2 className="premium-section-title">Free vs. Premium</h2>
+      <ScrollReveal className="premium-section">
+        <SplitText className="premium-section-title">Free vs. Premium</SplitText>
         <p className="premium-section-subtitle">
           Everything in Free, plus the tools to make it automatic.
         </p>
@@ -238,12 +277,12 @@ export default function Premium() {
             </tbody>
           </table>
         </GlassCard>
-      </div>
+      </ScrollReveal>
 
       {/* ── Waitlist CTA ── */}
-      <div className="premium-section premium-waitlist-section">
+      <ScrollReveal className="premium-section premium-waitlist-section">
         <GlassCard className="premium-waitlist-card">
-          <h2 className="premium-section-title">Be the first to know</h2>
+          <SplitText className="premium-section-title">Be the first to know</SplitText>
           <p className="premium-waitlist-body">
             Premium is in active development. Join the waitlist and founding
             members get <strong>3 months free</strong> when we launch.
@@ -274,7 +313,7 @@ export default function Premium() {
             </form>
           )}
         </GlassCard>
-      </div>
+      </ScrollReveal>
     </section>
   )
 }

@@ -23,7 +23,7 @@
 | Core Backend | 🟢 | 90% | API proxy, waitlist email, hold reminder runner, daily limit — all in place |
 | Core Frontend | 🟢 | 90% | Anonymous auth, paywall modal, account conversion, dashboard guidance, fluid typography done |
 | Feature Completion | 🟡 | 85% | Core loop, sharing, hold reminders, freemium gate done; remaining items are nice-to-haves |
-| Polish & QA | 🟡 | 60% | Privacy + Terms populated with real legal content; Profile UX polish in progress |
+| Polish & QA | 🟡 | 75% | Legal content, UI animation polish (6 phases) complete; Profile UX polish in progress |
 | Deployment & Launch | ⚪ | 15% | No launch pipeline or launch readiness checklist yet |
 
 ---
@@ -56,6 +56,8 @@
 - [ ] Premium demo on Premium page
 - [ ] Polish verdict quality, to make it more acceptable and people are willing to sign up
 - [ ] Add verdict feedback (i.e., thumbs up and down) in the verdict cards
+- [ ] Fix Profile verdict and purchase UI layout
+  Why: Card layouts, spacing, and responsiveness need polish to match the quality bar set by Landing/Premium pages. Visual inconsistencies hurt perceived product quality.
 
 ### 1b. Immediately After Launch (test on production)
 
@@ -120,6 +122,7 @@
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-13 | UI Animation Polish — 6-phase scroll/entrance animations across all pages | Static content felt flat; no progressive reveals, no premium feel | Landing/Premium hero cascades, scroll-triggered card staggers, $3.4K/90%/44% counter animations, SplitText word reveals, modal exit animations (5 modals), Dashboard verdict stagger, Profile tab fade, HowItWorks ScrollReveal. All respect `prefers-reduced-motion`. Tuning guide at `docs/ui-animation-tuning-guide.md` |
 | 2026-03-13 | Replace legal page boilerplate with real content from legal docs | Privacy and Terms pages had placeholder (Boilerplate) text; legal requirement per PRD 5.2 | Privacy.tsx: data retention, cookie policy (3 categories), CCPA disclosures, enriched data types/processors/legal basis, children's privacy. Terms.tsx: Quebec/Canada governing law, service description, subscription/payment, AI limitations, liability caps, entire agreement, physical address. Sourced from legal_docs/*.docx |
 | 2026-03-11 | Codebase modularization — split monolithic files into focused modules | App.css (5,833 lines), Profile.tsx (2,084 lines), API index.ts (1,185 lines) exceeded maintainability limits | CSS split into 6 domain files; Profile split into 4 tab components + constants; API split into 12 files (routes/middleware/emails) with factory DI; auth middleware deduplicated; Dashboard constants extracted. All builds pass, zero behavior changes |
 | 2026-03-11 | Fix OAuth & guest sign-in failures | `handle_new_user()` trigger failed on NULL email (anon/Apple) and UNIQUE(email) conflict (returning Google users with new auth UUID); captcha blocked anonymous sign-in; nav bar didn't show app links for guests | Google, Apple, and guest sign-in all working; guest Profile shows sign-up CTA; nav shows app links for all sessions |
@@ -203,3 +206,13 @@
   - Remaining low-priority items tracked in DEBT.md
 - [x] Replace Privacy + Terms boilerplate with real legal content — Privacy.tsx: data retention periods, cookie policy (3 categories with specific cookie names), CCPA disclosures, enriched data types/legal basis/processors, children's privacy. Terms.tsx: Quebec/Canada governing law, service description, subscription/payment, AI limitations, liability caps (12-month or CAD $100), entire agreement clause, Resila physical address. All content sourced from `legal_docs/*.docx` — **Branch:** `feat/legal-content-replace`
 - [x] Fix OAuth & guest sign-in — 2 new migrations (`handle_new_user()` NULL email skip + UNIQUE email conflict handler), `OAuthRedirector` component for programmatic post-OAuth navigation, nav bar shows app links for all sessions (not just signed-in), guest Profile CTA card replaces error message — **Branch:** `main`
+- [x] **UI Animation Polish** — 6-phase scroll and entrance animations for premium feel — **Branch:** `feat/ui-animation-polish`
+  - Phase 0: Foundation — `prefersReducedMotion()`, `useScrollReveal`, `ScrollReveal`, `useStaggerReveal`, `useCountUp`, `useModalAnimation` hooks in Kinematics.tsx. GSAP migrated from CDN to npm. Global CSS reduced-motion safety net.
+  - Phase 1: Landing page — hero cascading entrance (40% faster delays on mobile ≤600px), How It Works card stagger, $3,400/90%/44% counter animations, SplitText section titles, ScrollReveal on waitlist + footer CTA
+  - Phase 2: Premium page — hero entrance, 3 feature card grids with independent stagger refs, SplitText titles, ScrollReveal comparison table + waitlist
+  - Phase 3: Modal exit animations — `useModalAnimation` applied to PaywallModal, VerdictDetailModal, VerdictShareModal, GuestPromptModal, EvaluatingModal (200ms exit: backdrop fade + content slide/scale)
+  - Phase 4: Dashboard — verdict card stagger on data load (0.08s interval), form section fade-in on mount
+  - Phase 5: Profile tab transitions — CSS `@keyframes tabFadeIn` with `key={activeTab}` remount trigger
+  - Phase 6: HowItWorks — ScrollReveal + SplitText wrappers
+  - All animations respect `prefers-reduced-motion` (JS early returns + CSS overrides)
+  - Tuning guide: `docs/ui-animation-tuning-guide.md`

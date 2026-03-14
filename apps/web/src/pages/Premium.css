@@ -404,6 +404,27 @@
   }
 }
 
+/* ── Animation Initial States ── */
+
+.premium-badge,
+.premium-headline,
+.premium-subheadline {
+  opacity: 0;
+}
+
+.premium-feature-card {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-badge,
+  .premium-headline,
+  .premium-subheadline,
+  .premium-feature-card {
+    opacity: 1;
+  }
+}
+
 /* ── Touch Devices ── */
 
 @media (hover: none) and (pointer: coarse) {

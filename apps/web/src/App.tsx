@@ -20,7 +20,7 @@ import Terms from './pages/Terms'
 import Premium from './pages/Premium'
 import SharedVerdict from './pages/SharedVerdict'
 import './styles/App.css'
-import { CustomCursor, useGSAPLoader, LiquidButton, VolumetricInput } from './components/Kinematics'
+import { CustomCursor, LiquidButton, VolumetricInput } from './components/Kinematics'
 import { UserPreferencesProvider } from './preferences/UserPreferencesContext'
 import AnalyticsProvider from './components/AnalyticsProvider'
 import { analytics } from './hooks/useAnalytics'
@@ -362,7 +362,6 @@ function App() {
   const authToastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const previousProviders = useRef<string[]>([])
   const lastScrollY = useRef(0)
-  const gsapLoaded = useGSAPLoader()
 
   const showAuthToast = useCallback((message: string) => {
     if (authToastTimeout.current) clearTimeout(authToastTimeout.current)
@@ -748,7 +747,7 @@ function App() {
       <AnalyticsProvider session={session} sessionLoading={sessionLoading}>
       <UserPreferencesProvider session={session}>
         <div className="page">
-          {gsapLoaded && <CustomCursor />}
+          <CustomCursor />
           <header className={`topbar${headerScrolled ? ' topbar--scrolled' : ''}${headerHidden && !mobileMenuOpen ? ' topbar--hidden' : ''}`}>
             <Link to="/" className="brand">TruePick</Link>
             <nav className={`nav topbar-nav${mobileMenuOpen ? ' mobile-open' : ''}`}>

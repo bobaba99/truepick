@@ -1,6 +1,7 @@
 import type { VerdictRow } from '../api/core/types'
 import { sanitizeVerdictRationaleHtml } from '../utils/sanitizeHtml'
 import { useUserFormatting } from '../preferences/UserPreferencesContext'
+import { useModalAnimation } from './Kinematics'
 
 type VerdictDetailModalProps = {
   verdict: VerdictRow
@@ -28,7 +29,8 @@ export default function VerdictDetailModal({
   isRegenerating = false,
 }: VerdictDetailModalProps) {
   const { formatCurrency, formatDateTime } = useUserFormatting()
-  if (!isOpen) return null
+  const { shouldRender, backdropRef, contentRef } = useModalAnimation(isOpen)
+  if (!shouldRender) return null
 
   const reasoning = verdict.reasoning as ReasoningData | null
   const isImportant = reasoning?.importantPurchase === true
@@ -53,6 +55,7 @@ export default function VerdictDetailModal({
 
   return (
     <div
+      ref={backdropRef}
       className="modal-backdrop"
       onClick={handleBackdropClick}
       onKeyDown={handleKeyDown}
@@ -60,7 +63,7 @@ export default function VerdictDetailModal({
       aria-modal="true"
       tabIndex={-1}
     >
-      <div className="modal-content">
+      <div ref={contentRef} className="modal-content">
         <div className="modal-header">
           <div className="modal-title-row">
             <h2>{verdict.candidate_title}</h2>

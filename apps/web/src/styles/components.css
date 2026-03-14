@@ -1778,6 +1778,62 @@
 }
 
 /* Kinematics */
+
+.scroll-reveal-init {
+  opacity: 0;
+}
+
+/* Profile tab content fade */
+.profile-tab-content {
+  animation: tabFadeIn 0.25s ease;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-tab-content {
+    animation: none;
+  }
+}
+
+/* Dashboard verdict card stagger */
+.verdict-stack-vertical .verdict-card {
+  opacity: 0;
+}
+
+/* Dashboard form section fade-in */
+.decision-section {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal-init {
+    opacity: 1;
+  }
+
+  .verdict-stack-vertical .verdict-card {
+    opacity: 1;
+  }
+
+  .decision-section {
+    opacity: 1;
+  }
+
+  .cursor-dot,
+  .cursor-ring {
+    display: none;
+  }
+}
+
 .cursor-dot {
   position: fixed;
   top: 0;

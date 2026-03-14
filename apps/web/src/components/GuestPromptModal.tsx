@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LiquidButton } from './Kinematics'
+import { LiquidButton, useModalAnimation } from './Kinematics'
 
 type GuestPromptModalProps = {
   isOpen: boolean
@@ -12,6 +12,8 @@ export default function GuestPromptModal({
   onClose,
   onSignUp,
 }: GuestPromptModalProps) {
+  const { shouldRender, backdropRef, contentRef } = useModalAnimation(isOpen)
+
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e: KeyboardEvent) => {
@@ -21,7 +23,7 @@ export default function GuestPromptModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose()
@@ -29,13 +31,14 @@ export default function GuestPromptModal({
 
   return (
     <div
+      ref={backdropRef}
       className="modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-label="Create an account"
       onClick={handleBackdropClick}
     >
-      <div className="guest-prompt-modal">
+      <div ref={contentRef} className="guest-prompt-modal">
         <button
           type="button"
           className="modal-close guest-prompt-close"

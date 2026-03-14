@@ -629,6 +629,31 @@
   }
 }
 
+/* ── Animation Initial States ── */
+
+.landing-badge,
+.landing-headline,
+.landing-subheadline,
+.landing-hero-actions {
+  opacity: 0;
+}
+
+.landing-step-card,
+.landing-stat-card {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-badge,
+  .landing-headline,
+  .landing-subheadline,
+  .landing-hero-actions,
+  .landing-step-card,
+  .landing-stat-card {
+    opacity: 1;
+  }
+}
+
 /* ── Touch Devices ── */
 
 @media (hover: none) and (pointer: coarse) {
