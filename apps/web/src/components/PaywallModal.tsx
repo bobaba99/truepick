@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useModalAnimation } from './Kinematics'
 import { analytics } from '../hooks/useAnalytics'
 
@@ -140,6 +141,14 @@ export default function PaywallModal({
               Or sign up free to carry over your verdicts
             </button>
           )}
+
+          <Link
+            to="/premium"
+            className="paywall-signup-link"
+            onClick={onClose}
+          >
+            Learn more about Premium
+          </Link>
         </div>
       </div>
     </div>
