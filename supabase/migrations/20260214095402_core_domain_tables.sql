@@ -1,7 +1,7 @@
 -- Users and onboarding
 create table users (
   id uuid primary key default gen_random_uuid(),
-  email text unique not null,
+  email text unique, -- nullable for anonymous users
   created_at timestamp default now(),
   last_active timestamp,
   onboarding_completed boolean default false,
@@ -122,6 +122,7 @@ create table verdicts (
   actual_outcome text check (actual_outcome in ('satisfied', 'regret')), -- post-purchase swipe
   user_decision text check (user_decision in ('bought', 'hold', 'skip')), -- user's actual decision
   user_hold_until timestamp, -- when user's self-imposed hold expires
+  verdict_feedback smallint check (verdict_feedback in (1, -1)), -- thumbs up (1) / down (-1)
   created_at timestamp default now()
 );
 

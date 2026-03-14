@@ -22,6 +22,7 @@ type VerdictsTabProps = {
   onShareVerdict: (verdict: VerdictRow) => void
   onRegenerateVerdict: (verdict: VerdictRow) => void
   onDecision: (verdictId: string, decision: UserDecision) => void
+  onFeedback: (verdict: VerdictRow, value: 1 | -1) => void
   onDeleteVerdict: (verdictId: string) => void
   formatCurrency: (value: number | null) => string
   formatDate: (value: string | null) => string
@@ -44,6 +45,7 @@ export default function VerdictsTab({
   onShareVerdict,
   onRegenerateVerdict,
   onDecision,
+  onFeedback,
   onDeleteVerdict,
   formatCurrency,
   formatDate,
@@ -139,6 +141,34 @@ export default function VerdictsTab({
                     >
                       {isRegenerating ? 'Regenerating...' : 'Regenerate'}
                     </LiquidButton>
+                  </div>
+                  <div className="verdict-feedback-buttons">
+                    <button
+                      type="button"
+                      className={`feedback-btn feedback-up ${verdict.verdict_feedback === 1 ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); onFeedback(verdict, 1) }}
+                      disabled={isBusy}
+                      aria-label="Helpful verdict"
+                      title="Helpful"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+                        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={`feedback-btn feedback-down ${verdict.verdict_feedback === -1 ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); onFeedback(verdict, -1) }}
+                      disabled={isBusy}
+                      aria-label="Unhelpful verdict"
+                      title="Not helpful"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+                        <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+                      </svg>
+                    </button>
                   </div>
                   <div className="decision-buttons">
                     <LiquidButton

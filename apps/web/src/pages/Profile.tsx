@@ -20,6 +20,7 @@ import {
 import {
   getVerdictHistory,
   updateVerdictDecision,
+  updateVerdictFeedback,
   deleteVerdict,
   evaluatePurchase,
   submitVerdict,
@@ -274,7 +275,10 @@ export default function Profile({ session }: ProfileProps) {
       const todayUtc = new Date()
       todayUtc.setUTCHours(0, 0, 0, 0)
       const usedToday = data.filter(
-        (v) => v.created_at !== null && new Date(v.created_at).getTime() >= todayUtc.getTime()
+        (v) =>
+          v.created_at !== null &&
+          new Date(v.created_at).getTime() >= todayUtc.getTime() &&
+          v.scoring_model !== 'heuristic_fallback'
       ).length
       setVerdictsRemainingToday(Math.max(0, DAILY_LIMIT - usedToday))
     } catch {
@@ -605,6 +609,33 @@ export default function Profile({ session }: ProfileProps) {
     setVerdictSavingId(null)
   }
 
+  const handleVerdictFeedback = async (verdict: VerdictRow, value: 1 | -1) => {
+    if (!session) return
+
+    const newFeedback = verdict.verdict_feedback === value ? null : value
+    const previous = verdict.verdict_feedback ?? null
+
+    setVerdicts((prev) =>
+      prev.map((v) =>
+        v.id === verdict.id ? { ...v, verdict_feedback: newFeedback } : v
+      )
+    )
+
+    const feedbackLabel = newFeedback === 1 ? 'up' : newFeedback === -1 ? 'down' : 'removed'
+    analytics.trackVerdictFeedback(feedbackLabel, verdict.predicted_outcome ?? 'unknown')
+
+    const { error } = await updateVerdictFeedback(session.user.id, verdict.id, newFeedback)
+
+    if (error) {
+      setVerdicts((prev) =>
+        prev.map((v) =>
+          v.id === verdict.id ? { ...v, verdict_feedback: previous } : v
+        )
+      )
+      setStatus(error)
+    }
+  }
+
   const handleVerdictDelete = async (verdictId: string) => {
     if (!session) return
 
@@ -794,6 +825,7 @@ export default function Profile({ session }: ProfileProps) {
             onShareVerdict={setShareModalVerdict}
             onRegenerateVerdict={handleVerdictRegenerate}
             onDecision={handleVerdictDecision}
+            onFeedback={handleVerdictFeedback}
             onDeleteVerdict={handleVerdictDelete}
             formatCurrency={(v) => formatCurrency(v ?? 0)}
             formatDate={(v) => (v ? formatDate(v) : '')}
@@ -845,6 +877,11 @@ export default function Profile({ session }: ProfileProps) {
           onShare={(v) => {
             setSelectedVerdict(null)
             setShareModalVerdict(v)
+          }}
+          onFeedback={(v, value) => {
+            handleVerdictFeedback(v, value)
+            const newFeedback = v.verdict_feedback === value ? null : value
+            setSelectedVerdict({ ...v, verdict_feedback: newFeedback })
           }}
           isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />,

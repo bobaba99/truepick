@@ -317,6 +317,9 @@ const trackVerdictDetailOpened = (verdictValue: string) =>
 
 const trackVerdictRationaleExpanded = () => trackEvent('verdict_rationale_expanded')
 
+const trackVerdictFeedback = (feedback: 'up' | 'down' | 'removed', verdictOutcome: string) =>
+  trackEvent('verdict_feedback', { feedback, verdict_outcome: verdictOutcome })
+
 const trackFilterApplied = (page: string, filterType: string) =>
   trackEvent('filter_applied', { page, filter_type: filterType })
 
@@ -408,6 +411,7 @@ const analytics = {
   trackFormAbandoned,
   trackVerdictDetailOpened,
   trackVerdictRationaleExpanded,
+  trackVerdictFeedback,
   trackFilterApplied,
   trackProfileModalOpened,
   trackProfileModalAbandoned,

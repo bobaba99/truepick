@@ -114,7 +114,7 @@ export async function getRecentVerdict(userId: string): Promise<VerdictRow | nul
   const { data, error } = await supabase
     .from('verdicts')
     .select(
-      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, hold_release_at, created_at'
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, hold_release_at, verdict_feedback, created_at'
     )
     .eq('user_id', userId)
     .is('deleted_at', null)
@@ -134,7 +134,7 @@ export async function getVerdictHistory(userId: string, limit = 10): Promise<Ver
   const { data, error } = await supabase
     .from('verdicts')
     .select(
-      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until, verdict_feedback'
     )
     .eq('user_id', userId)
     .is('deleted_at', null)
@@ -270,6 +270,20 @@ export async function deleteVerdict(
   return { error: error?.message ?? null }
 }
 
+export async function updateVerdictFeedback(
+  userId: string,
+  verdictId: string,
+  feedback: 1 | -1 | null
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('verdicts')
+    .update({ verdict_feedback: feedback })
+    .eq('id', verdictId)
+    .eq('user_id', userId)
+
+  return { error: error?.message ?? null }
+}
+
 export function inputFromVerdict(verdict: VerdictRow): PurchaseInput {
   const reasoning = verdict.reasoning as { importantPurchase?: boolean } | null
   return {
@@ -362,7 +376,7 @@ export async function submitVerdict(
   const { data, error: fetchError } = await supabase
     .from('verdicts')
     .select(
-      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until'
+      'id, candidate_title, candidate_price, candidate_category, candidate_vendor, scoring_model, justification, predicted_outcome, confidence_score, reasoning, created_at, hold_release_at, user_proceeded, actual_outcome, user_decision, user_hold_until, verdict_feedback'
     )
     .eq('id', verdictId)
     .eq('user_id', userId)

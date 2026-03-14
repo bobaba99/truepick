@@ -289,6 +289,16 @@
     border-radius: 16px;
   }
 
+  .feedback-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .feedback-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
   .form-row {
     grid-template-columns: 1fr 1fr;
   }

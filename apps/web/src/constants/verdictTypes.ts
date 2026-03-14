@@ -37,6 +37,7 @@ export type VerdictRow = {
   actual_outcome?: string | null
   user_decision?: UserDecision | null
   user_hold_until?: string | null
+  verdict_feedback?: 1 | -1 | null
   created_at: string | null
 }
 

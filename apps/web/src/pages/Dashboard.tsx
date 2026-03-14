@@ -14,11 +14,13 @@ import {
   submitVerdict,
   inputFromVerdict,
   updateVerdictDecision,
+  updateVerdictFeedback,
 } from '../api/verdict/verdictService'
 import VerdictDetailModal from '../components/VerdictDetailModal'
 import VerdictShareModal from '../components/VerdictShareModal'
 import EvaluatingModal from '../components/EvaluatingModal'
 import PaywallModal from '../components/PaywallModal'
+import GuestPromptModal from '../components/GuestPromptModal'
 import OnboardingTutorial from '../components/onboarding/OnboardingTutorial'
 import { GlassCard, LiquidButton, VolumetricInput, SplitText } from '../components/Kinematics'
 import { useUserFormatting, useUserPreferences } from '../preferences/UserPreferencesContext'
@@ -79,6 +81,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [status, setStatus] = useState<string>('')
   const [statusType, setStatusType] = useState<'error' | 'info'>('error')
   const [paywallOpen, setPaywallOpen] = useState(false)
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false)
   const [verdictsUsedToday, setVerdictsUsedToday] = useState(0)
   const [verdictsRemainingToday, setVerdictsRemainingToday] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -118,7 +121,10 @@ export default function Dashboard({ session }: DashboardProps) {
       const todayUtc = new Date()
       todayUtc.setUTCHours(0, 0, 0, 0)
       const usedToday = data.filter(
-        (v) => v.created_at !== null && new Date(v.created_at).getTime() >= todayUtc.getTime()
+        (v) =>
+          v.created_at !== null &&
+          new Date(v.created_at).getTime() >= todayUtc.getTime() &&
+          v.scoring_model !== 'heuristic_fallback'
       ).length
       setVerdictsUsedToday(usedToday)
       setVerdictsRemainingToday(Math.max(0, DAILY_LIMIT - usedToday))
@@ -150,6 +156,15 @@ export default function Dashboard({ session }: DashboardProps) {
     }
     return false
   }, [])
+
+  const isGuest = session?.user.is_anonymous ?? false
+
+  const handleViewAllVerdicts = (e: React.MouseEvent) => {
+    if (isGuest) {
+      e.preventDefault()
+      setGuestPromptOpen(true)
+    }
+  }
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -373,6 +388,33 @@ export default function Dashboard({ session }: DashboardProps) {
     setVerdictSavingId(null)
   }
 
+  const handleVerdictFeedback = async (verdict: VerdictRow, value: 1 | -1) => {
+    if (!session) return
+
+    const newFeedback = verdict.verdict_feedback === value ? null : value
+    const previous = verdict.verdict_feedback ?? null
+
+    setRecentVerdicts((prev) =>
+      prev.map((v) =>
+        v.id === verdict.id ? { ...v, verdict_feedback: newFeedback } : v
+      )
+    )
+
+    const feedbackLabel = newFeedback === 1 ? 'up' : newFeedback === -1 ? 'down' : 'removed'
+    analytics.trackVerdictFeedback(feedbackLabel, verdict.predicted_outcome ?? 'unknown')
+
+    const { error } = await updateVerdictFeedback(session.user.id, verdict.id, newFeedback)
+
+    if (error) {
+      setRecentVerdicts((prev) =>
+        prev.map((v) =>
+          v.id === verdict.id ? { ...v, verdict_feedback: previous } : v
+        )
+      )
+      setStatus(error)
+    }
+  }
+
   const handleVerdictRegenerate = async (verdict: VerdictRow) => {
     if (!session) return
     if (submitting || verdictRegeneratingId) {
@@ -490,7 +532,7 @@ export default function Dashboard({ session }: DashboardProps) {
           ) : (
             <div className="reflection-bar-empty">No verdicts yet</div>
           )}
-          <Link to="/profile?tab=verdicts" className="reflection-bar-more">
+          <Link to="/profile?tab=verdicts" className="reflection-bar-more" onClick={handleViewAllVerdicts}>
             View all verdicts
           </Link>
         </div>
@@ -519,7 +561,7 @@ export default function Dashboard({ session }: DashboardProps) {
         <div className="verdict-result">
           <div className="section-header">
             <h2>Latest verdicts</h2>
-            <LiquidButton as={Link} to="/profile?tab=verdicts" className="ghost">More</LiquidButton>
+            <LiquidButton as={Link} to="/profile?tab=verdicts" className="ghost" onClick={handleViewAllVerdicts}>More</LiquidButton>
           </div>
           {recentVerdicts.length > 0 ? (
             <div className="verdict-stack-vertical">
@@ -612,6 +654,34 @@ export default function Dashboard({ session }: DashboardProps) {
                     >
                       {verdictRegeneratingId === verdict.id ? 'Regenerating...' : 'Regenerate'}
                     </LiquidButton>
+                  </div>
+                  <div className="verdict-feedback-buttons">
+                    <button
+                      type="button"
+                      className={`feedback-btn feedback-up ${verdict.verdict_feedback === 1 ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); handleVerdictFeedback(verdict, 1) }}
+                      disabled={verdictSavingId === verdict.id || verdictRegeneratingId !== null}
+                      aria-label="Helpful verdict"
+                      title="Helpful"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+                        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={`feedback-btn feedback-down ${verdict.verdict_feedback === -1 ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); handleVerdictFeedback(verdict, -1) }}
+                      disabled={verdictSavingId === verdict.id || verdictRegeneratingId !== null}
+                      aria-label="Unhelpful verdict"
+                      title="Not helpful"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+                        <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+                      </svg>
+                    </button>
                   </div>
                   <div className="decision-buttons">
                     <LiquidButton
@@ -792,6 +862,11 @@ export default function Dashboard({ session }: DashboardProps) {
             setSelectedVerdict(null)
             setShareModalVerdict(v)
           }}
+          onFeedback={(v, value) => {
+            handleVerdictFeedback(v, value)
+            const newFeedback = v.verdict_feedback === value ? null : value
+            setSelectedVerdict({ ...v, verdict_feedback: newFeedback })
+          }}
           isRegenerating={verdictRegeneratingId === selectedVerdict.id}
         />,
         document.body
@@ -819,7 +894,16 @@ export default function Dashboard({ session }: DashboardProps) {
           onSignUp={() => { setPaywallOpen(false); navigate('/auth?mode=sign_up') }}
           verdictsUsedToday={verdictsUsedToday}
           dailyLimit={DAILY_LIMIT}
-          isAnonymous={session?.user.is_anonymous ?? false}
+          isAnonymous={isGuest}
+        />,
+        document.body
+      )}
+
+      {guestPromptOpen && createPortal(
+        <GuestPromptModal
+          isOpen={guestPromptOpen}
+          onClose={() => setGuestPromptOpen(false)}
+          onSignUp={() => { setGuestPromptOpen(false); navigate('/auth?mode=sign_up') }}
         />,
         document.body
       )}

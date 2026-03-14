@@ -8,6 +8,7 @@ type VerdictDetailModalProps = {
   onClose: () => void
   onRegenerate?: (verdict: VerdictRow) => void
   onShare?: (verdict: VerdictRow) => void
+  onFeedback?: (verdict: VerdictRow, value: 1 | -1) => void
   isRegenerating?: boolean
 }
 
@@ -23,6 +24,7 @@ export default function VerdictDetailModal({
   onClose,
   onRegenerate,
   onShare,
+  onFeedback,
   isRegenerating = false,
 }: VerdictDetailModalProps) {
   const { formatCurrency, formatDateTime } = useUserFormatting()
@@ -181,6 +183,38 @@ export default function VerdictDetailModal({
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {onFeedback && (
+            <div className="detail-section">
+              <h3>Was this verdict helpful?</h3>
+              <div className="verdict-feedback-buttons">
+                <button
+                  type="button"
+                  className={`feedback-btn feedback-up ${verdict.verdict_feedback === 1 ? 'active' : ''}`}
+                  onClick={() => onFeedback(verdict, 1)}
+                  aria-label="Helpful verdict"
+                  title="Helpful"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+                    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={`feedback-btn feedback-down ${verdict.verdict_feedback === -1 ? 'active' : ''}`}
+                  onClick={() => onFeedback(verdict, -1)}
+                  aria-label="Unhelpful verdict"
+                  title="Not helpful"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+                    <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
 
