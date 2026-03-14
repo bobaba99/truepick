@@ -12,6 +12,11 @@
   margin: 0 auto;
 }
 
+.premium-page--bottom {
+  padding-top: 4rem;
+  padding-bottom: 2rem;
+}
+
 /* ── Hero ── */
 
 .premium-hero {

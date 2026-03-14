@@ -1,4 +1,14 @@
-/* ── Chrome Extension Demo ── */
+/* ── Chrome Extension Demo Section (full-width, outside .premium-page flex) ── */
+
+.ext-demo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+  gap: 1.5rem;
+}
 
 .ext-demo-container {
   width: 100%;
@@ -517,6 +527,32 @@
 .ext-demo-stacked .ext-demo-scene {
   position: relative;
   opacity: 1;
+}
+
+/* Make animated elements visible in stacked (non-animated) mobile layout */
+.ext-demo-stacked .ext-scene-product-card {
+  opacity: 1;
+}
+
+.ext-demo-stacked .ext-scene-notification {
+  transform: scale(1);
+}
+
+.ext-demo-stacked .ext-scene-overlay {
+  transform: translateY(0);
+}
+
+.ext-demo-stacked .ext-scene-overlay-badge {
+  transform: scale(1);
+}
+
+.ext-demo-stacked .ext-scene-prompt {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.ext-demo-stacked .ext-scene-blocked-bg {
+  filter: blur(4px);
+  opacity: 0.4;
 }
 
 /* ── Dark Theme ── */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useGSAPLoader, type GsapTimeline } from './Kinematics'
 import './ChromeExtensionDemo.css'
 
@@ -155,16 +155,14 @@ function useDesktopAnimation(
   gsapReady: boolean,
   containerRef: React.RefObject<HTMLDivElement | null>,
   setActiveScene: (scene: number) => void,
+  isMobile: boolean,
 ) {
   useEffect(() => {
-    if (!gsapReady || !containerRef.current) return
+    if (!gsapReady || !containerRef.current || isMobile) return
     const gsap = window.gsap
     if (!gsap) return
 
     const container = containerRef.current
-    const isMobile = window.matchMedia('(max-width: 900px)').matches
-    if (isMobile) return
-
     const scenes = container.querySelectorAll<HTMLElement>('[data-scene]')
     const notification = container.querySelector<HTMLElement>('[data-el="notification"]')
     const productCards = container.querySelectorAll<HTMLElement>('.ext-scene-product-card')
@@ -179,8 +177,8 @@ function useDesktopAnimation(
       const tl: GsapTimeline = gsap.timeline({
         scrollTrigger: {
           trigger: container,
-          start: 'top top',
-          end: '+=300%',
+          start: 'top 15%',
+          end: '+=250%',
           pin: true,
           scrub: 0.5,
           onUpdate: (self: { progress: number }) => {
@@ -194,11 +192,8 @@ function useDesktopAnimation(
 
       /* ── Scene 1: Session Awareness ── */
       tl.addLabel('scene1', 0)
-
-      // Fade in scene 1
       tl.to(scenes[0], { opacity: 1, duration: 0.05 }, 'scene1')
 
-      // Stagger product cards
       productCards.forEach((card, i) => {
         tl.fromTo(
           card,
@@ -208,81 +203,45 @@ function useDesktopAnimation(
         )
       })
 
-      // Notification bubble scales in
       if (notification) {
-        tl.to(
-          notification,
-          { scale: 1, duration: 0.06, ease: 'back.out(1.7)' },
-          'scene1+=0.16',
-        )
+        tl.to(notification, { scale: 1, duration: 0.06, ease: 'back.out(1.7)' }, 'scene1+=0.16')
       }
 
-      // Hold scene 1
       tl.addLabel('scene1End', 0.28)
-
-      // Fade out scene 1
       tl.to(scenes[0], { opacity: 0, duration: 0.05 }, 'scene1End')
 
       /* ── Scene 2: Checkout Interstitial ── */
       tl.addLabel('scene2', 0.33)
-
-      // Fade in scene 2
       tl.to(scenes[1], { opacity: 1, duration: 0.05 }, 'scene2')
 
-      // Overlay slides up
       if (overlay) {
-        tl.to(
-          overlay,
-          { y: '0%', duration: 0.08, ease: 'power3.out' },
-          'scene2+=0.07',
-        )
+        tl.to(overlay, { y: '0%', duration: 0.08, ease: 'power3.out' }, 'scene2+=0.07')
       }
 
-      // Badge scales in
       if (badge) {
-        tl.to(
-          badge,
-          { scale: 1, duration: 0.05, ease: 'back.out(1.7)' },
-          'scene2+=0.16',
-        )
+        tl.to(badge, { scale: 1, duration: 0.05, ease: 'back.out(1.7)' }, 'scene2+=0.16')
       }
 
-      // Hold scene 2
       tl.addLabel('scene2End', 0.62)
-
-      // Fade out scene 2
       tl.to(scenes[1], { opacity: 0, duration: 0.05 }, 'scene2End')
 
       /* ── Scene 3: Website Blocking ── */
       tl.addLabel('scene3', 0.67)
-
-      // Fade in scene 3
       tl.to(scenes[2], { opacity: 1, duration: 0.05 }, 'scene3')
 
-      // Blur the background
       if (blockedBg) {
-        tl.to(
-          blockedBg,
-          { filter: 'blur(4px)', opacity: 0.4, duration: 0.06 },
-          'scene3+=0.05',
-        )
+        tl.to(blockedBg, { filter: 'blur(4px)', opacity: 0.4, duration: 0.06 }, 'scene3+=0.05')
       }
 
-      // Prompt card scales in
       if (prompt) {
-        tl.to(
-          prompt,
-          { scale: 1, duration: 0.06, ease: 'back.out(1.7)' },
-          'scene3+=0.10',
-        )
+        tl.to(prompt, { scale: 1, duration: 0.06, ease: 'back.out(1.7)' }, 'scene3+=0.10')
       }
 
-      // Hold scene 3 visible
       tl.addLabel('scene3End', 0.95)
     }, container)
 
     return () => ctx.revert()
-  }, [gsapReady, containerRef, setActiveScene])
+  }, [gsapReady, containerRef, setActiveScene, isMobile])
 }
 
 /* ── Mobile Stacked Animation ── */
@@ -290,14 +249,12 @@ function useDesktopAnimation(
 function useMobileAnimation(
   gsapReady: boolean,
   stackedRef: React.RefObject<HTMLDivElement | null>,
+  isMobile: boolean,
 ) {
   useEffect(() => {
-    if (!gsapReady || !stackedRef.current) return
+    if (!gsapReady || !stackedRef.current || !isMobile) return
     const gsap = window.gsap
     if (!gsap) return
-
-    const isMobile = window.matchMedia('(max-width: 900px)').matches
-    if (!isMobile) return
 
     const items = stackedRef.current.querySelectorAll<HTMLElement>('.ext-demo-stacked-scene')
     if (!items.length) return
@@ -323,7 +280,7 @@ function useMobileAnimation(
     }, stackedRef.current)
 
     return () => ctx.revert()
-  }, [gsapReady, stackedRef])
+  }, [gsapReady, stackedRef, isMobile])
 }
 
 /* ── Main Component ── */
@@ -331,19 +288,28 @@ function useMobileAnimation(
 export default function ChromeExtensionDemo() {
   const gsapReady = useGSAPLoader()
   const [activeScene, setActiveScene] = useState(0)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false,
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const stackedRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setIsMobile(window.matchMedia('(max-width: 900px)').matches)
+    const mql = window.matchMedia('(max-width: 900px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
   }, [])
 
-  useDesktopAnimation(gsapReady, containerRef, setActiveScene)
-  useMobileAnimation(gsapReady, stackedRef)
+  const stableSetActiveScene = useCallback((scene: number) => {
+    setActiveScene(scene)
+  }, [])
+
+  useDesktopAnimation(gsapReady, containerRef, stableSetActiveScene, isMobile)
+  useMobileAnimation(gsapReady, stackedRef, isMobile)
 
   return (
-    <div className="premium-section">
+    <div className="ext-demo-section">
       <h2 className="premium-section-title">See it in action</h2>
       <p className="premium-section-subtitle">
         A quick look at how TruePick Premium works in your daily browsing.
