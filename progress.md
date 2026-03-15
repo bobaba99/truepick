@@ -53,11 +53,13 @@
 - [ ] Complete Profile and history UX polish — **Branch:** `fix/profile-history-ux-polish`
   Why: Core user-facing screen; rough UX harms first impressions and retention. Already in progress.
 - [ ] 10 articles in Resources for TruePick, putting the SEO and web search indexes as early as possible
+  - [x] Markdown seed pipeline: `content/resources/*.md` + `temp/seed-resources.ts` + `npm run seed:resources` — parses frontmatter, converts MD→HTML via `marked`, upserts to Supabase `resources` table on slug conflict. Dry-run mode available. 1 sample article included.
 - [x] Premium demo on Premium page
 - [ ] Polish verdict quality, to make it more acceptable and people are willing to sign up
 - [x] Add verdict feedback (i.e., thumbs up and down) in the verdict cards
-- [ ] Fix Profile verdict and purchase UI layout
+- [x] Fix Profile verdict and purchase UI layout
   Why: Card layouts, spacing, and responsiveness need polish to match the quality bar set by Landing/Premium pages. Visual inconsistencies hurt perceived product quality.
+- [x] Mass uploading workflow for resource articles — implemented as `npm run seed:resources` (markdown-to-Supabase pipeline)
 
 ### 1b. Immediately After Launch (test on production)
 
@@ -123,6 +125,7 @@
 
 | Date | Change | Reason | Impact |
 |------|--------|--------|--------|
+| 2026-03-15 | Markdown seed pipeline for resource articles | Need to author 10 articles locally in git-tracked markdown and bulk-publish to Supabase without using the admin UI one-by-one | `content/resources/` directory with YAML frontmatter template; `temp/seed-resources.ts` script (gray-matter + marked); `npm run seed:resources` and `seed:resources:dry` commands; idempotent upsert on slug; 1 sample article included |
 | 2026-03-13 | UI Animation Polish — 6-phase scroll/entrance animations across all pages | Static content felt flat; no progressive reveals, no premium feel | Landing/Premium hero cascades, scroll-triggered card staggers, $3.4K/90%/44% counter animations, SplitText word reveals, modal exit animations (5 modals), Dashboard verdict stagger, Profile tab fade, HowItWorks ScrollReveal. All respect `prefers-reduced-motion`. Tuning guide at `docs/ui-animation-tuning-guide.md` |
 | 2026-03-13 | Verdict feedback (thumbs up/down) + daily limit fix + GuestPromptModal | Users had no way to signal verdict quality; heuristic fallback verdicts incorrectly counted toward daily limit; anonymous users could navigate to profile without prompt | Feedback buttons on Dashboard/VerdictsTab/VerdictDetailModal with `verdict_feedback` column and analytics event; `heuristic_fallback` excluded from daily count (server + client); GuestPromptModal intercepts guest navigation to gated views |
 | 2026-03-13 | Replace legal page boilerplate with real content from legal docs | Privacy and Terms pages had placeholder (Boilerplate) text; legal requirement per PRD 5.2 | Privacy.tsx: data retention, cookie policy (3 categories), CCPA disclosures, enriched data types/processors/legal basis, children's privacy. Terms.tsx: Quebec/Canada governing law, service description, subscription/payment, AI limitations, liability caps, entire agreement, physical address. Sourced from legal_docs/*.docx |

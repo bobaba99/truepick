@@ -33,6 +33,10 @@
 - Implement SEO optimization for resources page.
   Why: Shared links and indexed resources need basic metadata and OG previews to avoid looking broken.
 - Generate a simple SEO optimization rule/document for future content publishing.
+- Automate resource seed pipeline via GitHub Action (CI/CD "git push to publish").
+  Why: Currently `npm run seed:resources` is manual. A GH Action on push to `content/resources/*.md` would make publishing automatic.
+- Add HTML sanitization to seed script output (DOMPurify or similar).
+  Why: `body_markdown` is rendered via `dangerouslySetInnerHTML` in ResourceDetail — safe for author-written content but worth hardening.
 - Add a confidence indicator to verdict cards/modal from stored `confidence_score`.
 - Auto language and currency selection
 - Promotion focused sentiment in marketing content

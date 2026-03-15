@@ -15,7 +15,9 @@
     "dev:web": "npm --workspace apps/web run dev",
     "dev:api": "npm --workspace apps/api run dev",
     "build:web": "npm --workspace apps/web run build",
-    "build:api": "npm --workspace apps/api run build"
+    "build:api": "npm --workspace apps/api run build",
+    "seed:resources": "npx tsx temp/seed-resources.ts",
+    "seed:resources:dry": "npx tsx temp/seed-resources.ts --dry-run"
   },
   "repository": {
     "type": "git",
@@ -30,7 +32,10 @@
   },
   "homepage": "https://github.com/bobaba99/truepick#readme",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@types/marked": "^5.0.2",
+    "concurrently": "^9.2.1",
+    "gray-matter": "^4.0.3",
+    "marked": "^17.0.4"
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",
